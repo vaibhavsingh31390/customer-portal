@@ -4,9 +4,9 @@ namespace App\Http\Complaint;
 
 use App\Mail\ComplaintCreatedMail;
 use App\Models\CustomerComplaint;
+use App\Support\SqlHelper;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Http\Request;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Validator;
 
 class ComplaintController extends BaseController
 {
-    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
+    use AuthorizesRequests, ValidatesRequests;
 
     public function showComplaints()
     {
@@ -28,9 +28,9 @@ class ComplaintController extends BaseController
     {
         $search = $request->input('search');
 
-        if ($request->client != "false") {
-            $user =  $request->session()->get('user');
-            $query = CustomerComplaint::where('CUST_CD', $user->eng_cd);
+        if ($request->client != 'false') {
+            $user = $request->session()->get('user');
+            $query = CustomerComplaint::where('client_code', $user->user_code);
         } else {
             $query = CustomerComplaint::query();
         }
@@ -40,23 +40,14 @@ class ComplaintController extends BaseController
             $query->where(function (Builder $q) use ($columns, $search) {
                 $lowerSearch = mb_strtolower($search, 'UTF-8');
                 foreach ($columns as $column) {
-                    $lowerColumn = mb_strtolower($column, 'UTF-8');
-                    $q->orWhereRaw('LOWER(' . $lowerColumn . ') like ?', ["%{$lowerSearch}%"]);
+                    $q->orWhereRaw('LOWER('.$column.') like ?', ["%{$lowerSearch}%"]);
                 }
             });
         }
-        $db_data = $query->where('STATUS', 'PN')->orderBy('COMPL_DT', 'DESC')
+        $db_data = $query->where('status', 'PN')->orderBy('complaint_date', 'DESC')
             ->orderBy($request->sorting, $request->order)
             ->paginate($request->per_page);
 
-
-        if ($request->order == 'ASC') {
-            $sorting = 'DESC';
-            $sorting_class = 'sorting_desc';
-        } else {
-            $sorting = 'ASC';
-            $sorting_class = 'sorting_asc';
-        }
         $count = $db_data->count();
         $number_of_page = $db_data->lastPage();
         $currentPage = $db_data->currentPage();
@@ -64,7 +55,7 @@ class ComplaintController extends BaseController
         $displayfrom = ($currentPage - 1) * $request->per_page + 1;
         $displayto = ($currentPage - 1) * $request->per_page + $count;
         $pagination = '';
-        //display the pagination
+
         if ($number_of_page > 1) {
             $prv = $currentPage - 1;
             $next = $currentPage + 1;
@@ -97,7 +88,7 @@ class ComplaintController extends BaseController
             <div class="col-sm-12 col-md-6">
                     <ul class="pagination">
                         <li class="paginate_button page-item last page-link">
-                        Showing ' . (int)$displayfrom  . ' of ' . ceil($total_items) . ' of  entries
+                        Showing ' . (int) $displayfrom . ' of ' . ceil($total_items) . ' of  entries
                         </li>
                     </ul>
             </div>';
@@ -105,59 +96,55 @@ class ComplaintController extends BaseController
 
         if ($count == 0) {
             return response()->json(['status' => 0, 'data' => $db_data, 'pagination' => $pagination, 'msg' => 'Data Not Found!']);
-        } else {
-            $records = '';
-            foreach ($db_data as $row) {
-                $link = base64_encode($row['complaint_no']);
-                $cust_cd = $row['cust_cd'];
-                $eng_cd =  $row['assign_to'];
-
-                $customer_name =  DB::select("SELECT CLIENT_NAME FROM CELINT_MASTER WHERE ERP_VERT='TERMS' AND CLIENT_CD = '$cust_cd' ORDER BY 1");
-                $style = strlen($row['problem_desc']) > 100 ? ' style="min-width: 500px;"' : ' style=""';
-                $assignto =  DB::select("SELECT ENG_NAME,ENG_CD FROM ENG_MASTER WHERE WORKING_ST='WK' AND DEPARTMENT='SWE' AND ENG_CD = '$eng_cd' ORDER BY 1");
-                $eng_cd = $eng_cd ? " ($eng_cd)" : "";
-                $records .= '<tr class="">
-                    <td><a href="/complaint/edit/' . $link . '">' . $row['complaint_no'] . '</a></td>
-                    <td>' .  (!empty($row['compl_dt']) ? date('d-m-Y', strtotime($row['compl_dt'])) : '-') . '</td>
-                    <td>' . $cust_cd . '</td>
-                    <td>' . @$customer_name[0]->client_name . '</td>
-                    <td>' . $row['status'] . '</td>
-                    <td>' . $row['module'] . '</td>
-                    <td>' . $row['compl_type'] . '</td>
-                    <td>' . $row['error_type'] . '</td>
-                    <td' . $style . '>' . $row['problem_desc'] . '</td>
-                    <td>' . (!empty($row['close_dt']) ? date('d-m-Y', strtotime($row['close_dt'])) : '-')  . '</td>
-                    <td>' . @$assignto[0]->eng_name  . $eng_cd . '</td>
-                    </tr>';
-            }
         }
+
+        $records = '';
+        foreach ($db_data as $row) {
+            $link = base64_encode($row['complaint_number']);
+            $clientCode = $row['client_code'];
+            $assignedTo = $row['assigned_to'];
+
+            $customer_name = SqlHelper::select(
+                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
+                [$clientCode]
+            );
+            $style = strlen($row['problem_description']) > 100 ? ' style="min-width: 500px;"' : ' style=""';
+            $assignto = SqlHelper::select(
+                'SELECT name, engineer_code FROM '.SqlHelper::table(SqlHelper::TABLE_ENGINEERS)." WHERE working_status = 'WK' AND department = 'SWE' AND engineer_code = ? ORDER BY 1",
+                [$assignedTo]
+            );
+            $assignedLabel = $assignedTo ? " ($assignedTo)" : '';
+            $records .= '<tr class="">
+                <td><a href="/complaint/edit/' . $link . '">' . $row['complaint_number'] . '</a></td>
+                <td>' . (! empty($row['complaint_date']) ? date('d-m-Y', strtotime($row['complaint_date'])) : '-') . '</td>
+                <td>' . $clientCode . '</td>
+                <td>' . @$customer_name[0]->name . '</td>
+                <td>' . $row['status'] . '</td>
+                <td>' . $row['module'] . '</td>
+                <td>' . $row['complaint_type'] . '</td>
+                <td>' . $row['error_type'] . '</td>
+                <td' . $style . '>' . $row['problem_description'] . '</td>
+                <td>' . (! empty($row['closed_date']) ? date('d-m-Y', strtotime($row['closed_date'])) : '-') . '</td>
+                <td>' . @$assignto[0]->name . $assignedLabel . '</td>
+                </tr>';
+        }
+
         return response()->json(['displayfrom' => $displayfrom, 'displayto' => $displayto, 'total_items' => $total_items, 'status' => 1, 'data' => $records, 'pagination' => $pagination, 'msg' => 'This is matched data!']);
     }
 
-
     public function showCreateComplaints()
     {
-        $module =  DB::select("SELECT MODULE_TEXT,MODULE_TEXT M1 FROM SAP_MODULE_DTL WHERE DEPT_MODULE='TERMS' ORDER BY 1");
-        $customer =  DB::select("SELECT CLIENT_NAME,CLIENT_CD,CLIENT_MAIL_ID FROM CELINT_MASTER WHERE ERP_VERT='TERMS' ORDER BY 1");
-        $assignto =  DB::select("SELECT ENG_NAME,ENG_CD FROM ENG_MASTER WHERE WORKING_ST='WK' AND DEPARTMENT='SWE' ORDER BY 1");
+        $module = SqlHelper::select('SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' ORDER BY 1");
+        $customer = SqlHelper::select('SELECT name, client_code, email FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' ORDER BY 1");
+        $assignto = SqlHelper::select('SELECT name, engineer_code FROM '.SqlHelper::table(SqlHelper::TABLE_ENGINEERS)." WHERE working_status = 'WK' AND department = 'SWE' ORDER BY 1");
+
         return view('dashboard.complaintCreate', ['module' => $module, 'customer' => $customer, 'assignto' => $assignto]);
     }
 
     public function saveCreateComplaints(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            // 'P3_MODULE' => 'required',
             'P3_COMPL_DT' => 'required',
-            // 'P3_CONTACT_MAIL_ID' => 'required|email',
-            // 'P3_USER_NAME' => 'required',
-            // 'P3_COMPL_TYPE' => 'required',
-            // 'P3_ERROR_TYPE' => 'required',
-            // 'P3_PROBLEM_DESC' => 'required',
-            // 'P3_MAWAI_REMARKS' => 'nullable',
-            // 'P3_COMPL_LEVEL' => 'required',
-            // 'P3_STATUS_TYPE' => 'required',
-            // 'P3_CUST_CD' => 'required',
-            // 'P3_UPLOAD' => 'nullable|file|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -167,28 +154,27 @@ class ComplaintController extends BaseController
         DB::beginTransaction();
 
         try {
-            $COMPLAINT_NO = DB::select("SELECT GEN_COMPL_NO as data FROM DUAL")[0]->data;
+            $complaintNumber = SqlHelper::selectOne(SqlHelper::genComplaintNoQuery())?->data;
 
-            // Prepare data for create method
             $data = [
-                'COMPLAINT_NO' => $COMPLAINT_NO,
-                'COMPL_DT' => $request->input('P3_COMPL_DT'),
-                'CUST_CD' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
-                'MODULE' => $request->input('P3_MODULE'),
-                'COMPL_TYPE' => $request->input('P3_COMPL_TYPE'),
-                'ERROR_TYPE' => $request->input('P3_ERROR_TYPE'),
-                'PROBLEM_DESC' => $request->input('P3_PROBLEM_DESC'),
-                'COMPL_LEVEL' => $request->input('P3_COMPL_LEVEL'),
-                'STATUS' => $request->input('P3_STATUS_TYPE'),
-                'MAWAI_REMARKS' => $request->input('P3_MAWAI_REMARKS'),
-                'USER_NAME' => $request->input('P3_USER_NAME'),
-                'CONTACT_MAIL_ID' => $request->input('P3_CONTACT_MAIL_ID'),
-                'TIME_TAKEN' => $request->input('P8_TIME_TAKEN'),
-                'CLOSE_DT' => $request->input('P3_CLOSE_DT_TYPE'),
-                'ASSIGN_TO' => $request->input('P8_ASSIGN_TO'),
-                'CHANGE_DONE_BY' => $request->input('P8_CHANGE_DONE_BY'),
-                'REASON' => $request->input('P8_REASON'),
-                'ACTION' => $request->input('P8_ACTION'),
+                'complaint_number' => $complaintNumber,
+                'complaint_date' => $request->input('P3_COMPL_DT'),
+                'client_code' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
+                'module' => $request->input('P3_MODULE'),
+                'complaint_type' => $request->input('P3_COMPL_TYPE'),
+                'error_type' => $request->input('P3_ERROR_TYPE'),
+                'problem_description' => $request->input('P3_PROBLEM_DESC'),
+                'priority' => $request->input('P3_COMPL_LEVEL'),
+                'status' => $request->input('P3_STATUS_TYPE'),
+                'internal_remarks' => $request->input('P3_MAWAI_REMARKS'),
+                'contact_name' => $request->input('P3_USER_NAME'),
+                'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
+                'time_taken' => $request->input('P8_TIME_TAKEN'),
+                'closed_date' => $request->input('P3_CLOSE_DT_TYPE'),
+                'assigned_to' => $request->input('P8_ASSIGN_TO'),
+                'changed_by' => $request->input('P8_CHANGE_DONE_BY'),
+                'reason' => $request->input('P8_REASON'),
+                'action_taken' => $request->input('P8_ACTION'),
             ];
 
             if ($request->hasFile('P3_UPLOAD')) {
@@ -196,29 +182,30 @@ class ComplaintController extends BaseController
                 $filename = time() . '_' . $file->getClientOriginalName();
 
                 $uploadPath = public_path('uploads');
-                if (!file_exists($uploadPath)) {
+                if (! file_exists($uploadPath)) {
                     mkdir($uploadPath, 0755, true);
                 }
 
                 $file->move($uploadPath, $filename);
 
-                $data['FILENAME'] = '/uploads/' . $filename;
+                $data['attachment_name'] = '/uploads/' . $filename;
             }
-            CustomerComplaint::create($data);
+
+            CustomerComplaint::create(array_merge($data, [
+                'id' => 'COMP-' . str_replace(['CP', '-'], '', $complaintNumber),
+            ]));
             DB::commit();
 
             $mailTo = $request->input('P3_CONTACT_MAIL_ID');
-            // $mailTo = 'vaibhav.singh@mawaimail.com';
             $cc = env('MAIL_CC');
-            // $cc = 'vaibhav.singh@mawaimail.com';
-            if ($mailTo != "") {
-                $user =  $request->session()->get('user');
-                if (!($user->eng_cd && preg_match('/^S/', $user->eng_cd))) {
+            if ($mailTo != '') {
+                $user = $request->session()->get('user');
+                if (! ($user->user_code && preg_match('/^S/', $user->user_code))) {
                     $mailTo = env('MAIL_CC');
                     $cc = env('P3_CONTACT_MAIL_ID');
                 }
                 $email = Mail::to($mailTo);
-                if (!empty($cc)) {
+                if (! empty($cc)) {
                     $email->cc($cc);
                 }
                 $email->send(new ComplaintCreatedMail($data));
@@ -227,41 +214,46 @@ class ComplaintController extends BaseController
             return response()->json(['type' => 1, 'message' => 'Complaint created successfully.']);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['type' => 0, 'message' => $e->getMessage()]);
         }
     }
 
-
-
     public function showEditComplaints($id)
     {
         $id = base64_decode($id);
-        $data = DB::select("SELECT * FROM MAWAI.CUSTOMER_COMPLAINT WHERE COMPLAINT_NO  = '$id'");
+        $data = SqlHelper::selectOne(
+            'SELECT * FROM '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' WHERE complaint_number = ?',
+            [$id]
+        );
 
-        $custcd = $data[0]->cust_cd;
-        $module =  DB::select("SELECT MODULE_TEXT,MODULE_TEXT M1 FROM SAP_MODULE_DTL WHERE DEPT_MODULE='TERMS' ORDER BY 1");
-        $customer =  DB::select("SELECT CLIENT_NAME,CLIENT_CD,CLIENT_MAIL_ID FROM CELINT_MASTER WHERE ERP_VERT='TERMS' ORDER BY 1");
-        $customer_name =  DB::select("SELECT CLIENT_NAME FROM CELINT_MASTER WHERE ERP_VERT='TERMS' AND CLIENT_CD = '$custcd' ORDER BY 1");
-        $assignto =  DB::select("SELECT ENG_NAME,ENG_CD FROM ENG_MASTER WHERE WORKING_ST='WK' AND DEPARTMENT='SWE' ORDER BY 1");
-        return view('dashboard.complaintEdit', ['module' => $module, 'customer' => $customer, 'assignto' => $assignto, 'data' => $data[0], 'customer_name' => $customer_name[0]]);
+        if (! $data) {
+            abort(404);
+        }
+
+        $clientCode = $data->client_code;
+        $module = SqlHelper::select('SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' ORDER BY 1");
+        $customer = SqlHelper::select('SELECT name, client_code, email FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' ORDER BY 1");
+        $customer_name = SqlHelper::selectOne(
+            'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
+            [$clientCode]
+        );
+        $assignto = SqlHelper::select('SELECT name, engineer_code FROM '.SqlHelper::table(SqlHelper::TABLE_ENGINEERS)." WHERE working_status = 'WK' AND department = 'SWE' ORDER BY 1");
+
+        return view('dashboard.complaintEdit', [
+            'module' => $module,
+            'customer' => $customer,
+            'assignto' => $assignto,
+            'data' => $data,
+            'customer_name' => $customer_name,
+        ]);
     }
-
 
     public function saveEditComplaints(Request $request, $id)
     {
-
         $id = base64_decode($id);
         $validator = Validator::make($request->all(), [
-            // 'P3_MODULE' => 'required',
             'P3_COMPL_DT' => 'required',
-            // 'P3_CONTACT_MAIL_ID' => 'required|email',
-            // 'P3_USER_NAME' => 'required',
-            // 'P3_COMPL_TYPE' => 'required',
-            // 'P3_ERROR_TYPE' => 'required',
-            // 'P3_PROBLEM_DESC' => 'required',
-            // 'P3_MAWAI_REMARKS' => 'nullable',
-            // 'P3_COMPL_LEVEL' => 'required',
-            // 'P3_STATUS_TYPE' => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -271,30 +263,32 @@ class ComplaintController extends BaseController
         DB::beginTransaction();
 
         try {
-            $complaint = CustomerComplaint::where('COMPLAINT_NO', $id)->update([
-                'COMPL_DT' => $request->input('P3_COMPL_DT'),
-                'CUST_CD' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
-                'MODULE' => $request->input('P3_MODULE'),
-                'COMPL_TYPE' => $request->input('P3_COMPL_TYPE'),
-                'ERROR_TYPE' => $request->input('P3_ERROR_TYPE'),
-                'PROBLEM_DESC' => $request->input('P3_PROBLEM_DESC'),
-                'COMPL_LEVEL' => $request->input('P3_COMPL_LEVEL'),
-                'STATUS' => $request->input('P3_STATUS_TYPE'),
-                'MAWAI_REMARKS' => $request->input('P3_MAWAI_REMARKS'),
-                'USER_NAME' => $request->input('P3_USER_NAME'),
-                'CONTACT_MAIL_ID' => $request->input('P3_CONTACT_MAIL_ID'),
-                'TIME_TAKEN' => $request->input('P8_TIME_TAKEN'),
-                'CLOSE_DT' => $request->input('P3_CLOSE_DT_TYPE'),
-                'ASSIGN_TO' => $request->input('P8_ASSIGN_TO'),
-                'CHANGE_DONE_BY' => $request->input('P8_CHANGE_DONE_BY'),
-                'REASON' => $request->input('P8_REASON'),
-                'ACTION' => $request->input('P8_ACTION'),
+            CustomerComplaint::where('complaint_number', $id)->update([
+                'complaint_date' => $request->input('P3_COMPL_DT'),
+                'client_code' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
+                'module' => $request->input('P3_MODULE'),
+                'complaint_type' => $request->input('P3_COMPL_TYPE'),
+                'error_type' => $request->input('P3_ERROR_TYPE'),
+                'problem_description' => $request->input('P3_PROBLEM_DESC'),
+                'priority' => $request->input('P3_COMPL_LEVEL'),
+                'status' => $request->input('P3_STATUS_TYPE'),
+                'internal_remarks' => $request->input('P3_MAWAI_REMARKS'),
+                'contact_name' => $request->input('P3_USER_NAME'),
+                'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
+                'time_taken' => $request->input('P8_TIME_TAKEN'),
+                'closed_date' => $request->input('P3_CLOSE_DT_TYPE'),
+                'assigned_to' => $request->input('P8_ASSIGN_TO'),
+                'changed_by' => $request->input('P8_CHANGE_DONE_BY'),
+                'reason' => $request->input('P8_REASON'),
+                'action_taken' => $request->input('P8_ACTION'),
             ]);
 
             DB::commit();
+
             return response()->json(['type' => 1, 'message' => 'Complaint updated successfully.']);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['type' => 0, 'message' => $e->getMessage()]);
         }
     }
@@ -304,8 +298,8 @@ class ComplaintController extends BaseController
         $filePath = public_path('uploads/' . $filename);
         if (file_exists($filePath)) {
             return response()->download($filePath);
-        } else {
-            abort(404, 'File not found.');
         }
+
+        abort(404, 'File not found.');
     }
 }

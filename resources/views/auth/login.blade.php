@@ -2,97 +2,57 @@
 
 @section('title', 'Login')
 
-@section('styles')
-    <style>
-        .auth-bg {
-            background-image: url({{ asset('assets/img/bg.png') }});
-        }
-
-        .auth-bg {
-            background-size: cover;
-            background-position: center center;
-            background-origin: border-box;
-            min-height: 100svh;
-            min-width: 100svw;
-            box-shadow: rgba(17, 17, 26, 0.1) 0px 8px 24px, rgba(17, 17, 26, 0.1) 0px 16px 56px, rgba(17, 17, 26, 0.1) 0px 24px 80px;
-        }
-
-        .auth-box {
-            box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
-        }
-
-        .small-logo {
-            /* box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px; */
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .auth-main-content {
-            /* height: auto !important; */
-            /* min-height: 100svh !important; */
-        }
-
-
-
-
-        @media (max-width: 768px) {
-            .auth-main-content {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-        }
-    </style>
-@endsection
-
 @section('content')
-    <div class="auth-main-content auth-bg">
-        <div class="d-table">
-            <div class="d-tablecell">
-                <div class="auth-box">
-                    <div class="row align-items-center">
-                        <div class="col-md-6 d-none d-md-block">
-                            <div class="form-left-content">
-                                <div class="auth-logo">
-                                    <img src="{{ asset('assets/img/mawai.png') }}" alt="Mawai Logo" class="small-logo mb-3"
-                                        style="max-width: 60%;">
-                                </div>
+    <button type="button" id="theme-toggle" class="portal-auth__theme-btn portal-topnav__icon-btn" aria-label="Toggle theme">
+        <i data-lucide="moon" aria-hidden="true"></i>
+    </button>
 
-                                <div class="auth-logo">
-                                    <img src="{{ asset('assets/img/Support-Center.svg') }}" alt="Logo">
-                                </div>
-                                <p class="mt-3 text-center" style="font-size: 11px;">Copyright © {{ date('Y') }} Mawai
-                                    Infotech
-                                    Ltd. All rights reserved
-                                </p>
-                            </div>
-                        </div>
+    <div class="portal-auth">
+        <div class="portal-auth__card">
+            <div class="portal-auth__grid">
+                <div class="portal-auth__brand">
+                    <x-brand-logo class="portal-auth__logo" />
+                    <p class="portal-auth__brand-tagline">Built for modern customer support</p>
+                    @include('include.brandCopyright')
+                </div>
 
-                        <div class="col-md-6">
-                            <div class="form-content">
-                                <div class="auth-logo text-center d-block d-md-none">
-                                    <img src="{{ asset('assets/img/mawai.png') }}" alt="Mawai Logo" class="mb-3"
-                                        style="max-width: 60%;">
-                                </div>
-                                <h1 class="heading">Log In</h1>
-                                <form action="{{ route('login') }}" method="POST">
-                                    @csrf
-                                    <div class="form-group">
-                                        <label class="form-label">Username</label>
-                                        <input type="text" class="form-control" id="username" name="username" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Password</label>
-                                        <input type="password" class="form-control" id="password" name="password" required>
-                                    </div>
-                                    <div class="text-center">
-                                        <button type="submit" class="btn btn-primary">Log In</button>
-                                        {{-- <a class="fp-link" href="{{ route('password.request') }}">Forgot Password?</a> --}}
-                                    </div>
-                                </form>
-                            </div>
+                <div class="portal-auth__form-wrap">
+                    <x-brand-logo class="portal-auth__logo d-md-none mb-4" />
+                    <h1 class="portal-auth__title">Welcome back</h1>
+                    <p class="portal-auth__subtitle">Sign in to your customer portal</p>
+
+                    <form id="login-form" action="{{ route('login') }}" method="POST">
+                        @csrf
+                        <div class="form-group">
+                            <label class="form-label" for="username">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required autocomplete="username">
                         </div>
-                    </div>
+                        <div class="form-group">
+                            <label class="form-label" for="password">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary portal-btn portal-auth__submit w-100">
+                            <span class="portal-btn__label">Log In</span>
+                            <span class="loader-btn portal-btn__spinner" aria-hidden="true"></span>
+                        </button>
+                    </form>
+
+                    @env('local')
+                    @if ($testMode)
+                        <div class="portal-test-panel test-mode-panel">
+                            <span class="portal-test-panel__badge test-mode-badge">Test Mode</span>
+                            <p class="portal-test-panel__hint">Quick login with seeded test accounts:</p>
+                            @foreach ($testAccounts as $account)
+                                <button type="button" class="portal-test-login-btn test-login-btn"
+                                    data-username="{{ $account['username'] }}"
+                                    data-password="{{ $account['password'] }}">
+                                    <strong>{{ $account['label'] }}</strong>
+                                    <span>{{ $account['username'] }} / {{ $account['password'] }} — {{ $account['description'] }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
+                    @endenv
                 </div>
             </div>
         </div>
@@ -100,12 +60,23 @@
 @endsection
 
 @section('scripts')
-    {{-- If you need to show errors --}}
+    @env('local')
+    @if ($testMode ?? false)
+        <script>
+            document.querySelectorAll('.test-login-btn').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    document.getElementById('username').value = this.dataset.username;
+                    document.getElementById('password').value = this.dataset.password;
+                    document.getElementById('login-form').submit();
+                });
+            });
+        </script>
+    @endif
+    @endenv
+
     @if ($errors->any())
         @foreach ($errors->all() as $error)
-            <script>
-                showToast('{{ $error }}', false);
-            </script>
+            <script>showToast(@json($error), false);</script>
         @endforeach
     @endif
 @endsection

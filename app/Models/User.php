@@ -9,18 +9,18 @@ class User extends Authenticatable
 {
     use Notifiable;
 
+    protected $table = 'portal_users';
 
-    protected $table = 'MAWAI_USER_MASTER';
-    protected $primaryKey = 'ENG_CD';
+    protected $primaryKey = 'user_code';
 
     public $incrementing = false;
 
     protected $fillable = [
-        'USER_NAME', 'EMAIL_ID', 'USER_PASSWORD',
+        'user_code', 'username', 'email', 'password', 'status',
     ];
 
     protected $hidden = [
-        'USER_PASSWORD', 'remember_token',
+        'password', 'remember_token',
     ];
 
     protected $casts = [
@@ -31,11 +31,11 @@ class User extends Authenticatable
 
     public function getAuthPassword()
     {
-        return $this->USER_PASSWORD;
+        return $this->password;
     }
 
     public function getEmailForPasswordReset()
     {
-        return $this->EMAIL_ID;
+        return $this->email;
     }
 }

@@ -6,36 +6,21 @@
 @endsection
 
 @section('content')
-    <!-- Page Wrapper -->
-    <div id="wrapper">
-        @if (Session::get('user')->eng_cd && preg_match('/^[S]/', Session::get('user')->eng_cd))
-            @include('include.sidebarSupport')
-            @include('complaint.editSupport')
-        @else
-            @include('include.sidebar')
-            @include('complaint.edit')
-        @endif
-
-
-        <!-- Scroll to Top Button-->
-        <a class="scroll-to-top rounded" href="#page-top">
-            <i class="fas fa-angle-up"></i>
-        </a>
-
-        <!-- Logout Modal-->
-
-
-    </div>
-    <!-- End of Page Wrapper -->
-
+    @if (Session::get('user')->user_code && preg_match('/^[S]/', Session::get('user')->user_code))
+        @include('include.sidebarSupport')
+        @include('complaint.editSupport')
+    @else
+        @include('include.sidebar')
+        @include('complaint.edit')
+    @endif
 @endsection
 
 @section('scripts')
     <script>
         $(document).ready(function() {
-            $('#P8_CUST_CD, #P3_MODULE, #P8_CHANGE_DONE_BY, #P8_ASSIGN_TO').each(function() {
-                $(this).select2();
-            });
+            if (window.PortalUI && window.PortalUI.initSelect2) {
+                window.PortalUI.initSelect2('.portal-select2');
+            }
 
             $('#resetFieldsRegister').click(function(e) {
                 console.log('yes');

@@ -3,21 +3,34 @@
 namespace App\Http\Auth;
 
 use App\Models\User;
+use App\Support\SqlHelper;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
 
 class AuthController extends BaseController
 {
-    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
+    use AuthorizesRequests, ValidatesRequests;
 
     public function showLoginForm()
     {
-        return view('auth.login');
+        $testMode = app()->environment('local') && config('test.enabled');
+
+        return view('auth.login', [
+            'testMode' => $testMode,
+            'testAccounts' => $testMode ? $this->testAccountsForPanel() : [],
+        ]);
+    }
+
+    protected function testAccountsForPanel(): array
+    {
+        $password = config('test.dummy_password');
+
+        return collect(config('test.accounts', []))
+            ->map(fn (array $account) => array_merge($account, ['password' => $password]))
+            ->all();
     }
 
     public function login(Request $request)
@@ -27,15 +40,17 @@ class AuthController extends BaseController
             'password' => 'required',
         ]);
 
-        $user = User::where('USER_NAME', $credentials['username'])->where('USER_STATUS', 'Y')->first();
+        $user = User::where('username', $credentials['username'])->where('status', 'Y')->first();
 
-        if (!$user || $credentials['password'] !== $user->user_password) {
+        if (! $user || $credentials['password'] !== $user->getAuthPassword()) {
             return back()->withErrors([
-                'email' => 'The provided credentials do not match our records.',
-            ]);
+                'username' => 'The provided credentials do not match our records.',
+            ])->withInput($request->only('username'));
         }
-        $token = encrypt($user->user_name);
+
+        $token = encrypt($user->user_code);
         $request->session()->put('user_token', $token);
+
         return redirect()->route('dashboard');
     }
 
@@ -44,68 +59,88 @@ class AuthController extends BaseController
         $request->session()->forget('user_token');
         $request->session()->forget('user');
         $request->session()->forget('name');
+
         return redirect()->route('login.form');
     }
 
-
     public function dashboard(Request $request)
     {
-        $user =  $request->session()->get('user');
-        $customer = DB::select("
-        SELECT 
-            COUNT(CASE WHEN STATUS = 'PN' THEN 1 END) AS COUNT_PEND,
-            COUNT(*) AS TOTAL_COUNT 
-        FROM 
-            \"CUSTOMER_COMPLAINT\" 
-        WHERE 
-            \"CUST_CD\" = '$user->eng_cd' 
-            AND TRUNC(\"COMPL_DT\", 'MM') = TRUNC(SYSDATE, 'MM')
-        ");
-        return view('dashboard.dashboard', ['customer' => @$customer[0]]);
+        $user = $request->session()->get('user');
+        $customer = SqlHelper::select('
+        SELECT
+            COUNT(CASE WHEN status = \'PN\' THEN 1 END) AS count_pend,
+            COUNT(*) AS total_count
+        FROM
+            '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).'
+        WHERE
+            '.SqlHelper::column('client_code').' = ?
+            AND '.SqlHelper::currentMonthFilter('complaint_date').'
+        ', [$user->user_code]);
+
+        return view('dashboard.dashboard', [
+            'customer' => SqlHelper::dashboardSummary($customer[0] ?? null),
+            'supportSummary' => $this->supportDashboardSummary(),
+        ]);
+    }
+
+    protected function supportDashboardSummary(): object
+    {
+        $row = SqlHelper::selectOne('
+            SELECT
+                COUNT(*) AS total,
+                COUNT(CASE WHEN status = \'PN\' THEN 1 END) AS total_pend
+            FROM
+                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
+            WHERE
+                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
+        ');
+
+        return (object) [
+            'total_count' => (int) ($row->total ?? 0),
+            'count_pend' => (int) ($row->total_pend ?? 0),
+        ];
     }
 
     public function getPendingList(Request $request)
     {
+        $total_analytics = SqlHelper::selectOne('
+            SELECT
+                COUNT(*) AS total,
+                COUNT(CASE WHEN cc.status = \'PN\' THEN 1 END) AS total_pend
+            FROM
+                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
+            LEFT JOIN
+                '.SqlHelper::table(SqlHelper::TABLE_CLIENTS).' c
+            ON
+                c.client_code = cc.client_code
+            WHERE
+                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
+        ');
 
-        $total_analytics = DB::select("
-            SELECT 
-                COUNT(*) AS TOTAL,
-                COUNT(CASE WHEN CC.STATUS = 'PN' THEN 1 END) AS TOTAL_PEND
-            FROM 
-                \"CUSTOMER_COMPLAINT\" CC
-            LEFT JOIN 
-                \"CELINT_MASTER\" CM 
-            ON 
-                CM.CLIENT_CD = CC.CUST_CD 
-            WHERE 
-                TRUNC(CC.\"COMPL_DT\", 'MM') = TRUNC(SYSDATE, 'MM')
-        ")[0];
+        $search = $request->search != '' ? $request->search : '%';
 
-
-        $search = $request->search != '' ? $request->search : "%";
-
-        $All = DB::select("
-            SELECT 
-                CC.CUST_CD,  
-                CM.CLIENT_NAME, 
-                COUNT(CASE WHEN CC.STATUS = 'PN' THEN 1 END) AS COUNT_PEND
-            FROM 
-                \"CUSTOMER_COMPLAINT\" CC 
-            LEFT JOIN 
-                \"CELINT_MASTER\" CM 
-            ON  
-                CM.CLIENT_CD = CC.CUST_CD 
-            WHERE 
-                TRUNC(CC.\"COMPL_DT\", 'MM') = TRUNC(SYSDATE, 'MM') 
-                AND LOWER(CM.CLIENT_NAME) LIKE '%' || LOWER(:search) || '%'
-            GROUP BY 
-                CC.CUST_CD, 
-                CM.CLIENT_NAME
-             HAVING COUNT(CASE WHEN CC.STATUS = 'PN' THEN 1 END) > 0    
-        ", ['search' => mb_strtolower($search, 'UTF-8')]);
+        $All = SqlHelper::select('
+            SELECT
+                cc.client_code,
+                c.name AS client_name,
+                COUNT(CASE WHEN cc.status = \'PN\' THEN 1 END) AS count_pend
+            FROM
+                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
+            LEFT JOIN
+                '.SqlHelper::table(SqlHelper::TABLE_CLIENTS).' c
+            ON
+                c.client_code = cc.client_code
+            WHERE
+                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
+                AND '.SqlHelper::likeContains('c.name', ':search').'
+            GROUP BY
+                cc.client_code,
+                c.name
+             HAVING COUNT(CASE WHEN cc.status = \'PN\' THEN 1 END) > 0
+        ', ['search' => mb_strtolower($search, 'UTF-8')]);
 
         $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = !empty($request->per_page) ? $request->per_page : 10;
+        $perPage = ! empty($request->per_page) ? $request->per_page : 10;
         $resultsCollection = collect($All);
         $currentPageItems = $resultsCollection->slice(($page - 1) * $perPage, $perPage)->all();
         $btl_datas = new LengthAwarePaginator(
@@ -122,7 +157,7 @@ class AuthController extends BaseController
         $displayfrom = ($currentPage - 1) * $request->per_page + 1;
         $displayto = ($currentPage - 1) * $request->per_page + $count;
         $pagination = '';
-        //display the pagination
+
         if ($number_of_page > 1) {
             $prv = $currentPage - 1;
             $next = $currentPage + 1;
@@ -155,7 +190,7 @@ class AuthController extends BaseController
                 <div class="col-sm-12 col-md-6">
                         <ul class="pagination">
                             <li class="paginate_button page-item last page-link">
-                            Showing ' . (int)$displayfrom  . ' of ' . ceil($total_items) . ' of  entries
+                            Showing ' . (int) $displayfrom . ' of ' . ceil($total_items) . ' of  entries
                             </li>
                         </ul>
                 </div>';
@@ -163,44 +198,39 @@ class AuthController extends BaseController
 
         if ($count == 0) {
             return response()->json(['status' => 0, 'data' => $btl_datas, 'pagination' => $pagination, 'msg' => 'Data Not Found!', 'total_analytics' => $total_analytics]);
-        } else {
-            $records = '';
-            $total_pend = 0;
-            foreach ($btl_datas as $row) {
-                $total_pend += (int) $row->count_pend;
-                $records .= '<tr class="">
-                    <td>' . $row->client_name . '</td>
-                    <td>' . $row->count_pend . '</td>
-                    </tr>';
-            }
         }
+
+        $records = '';
+        foreach ($btl_datas as $row) {
+            $records .= '<tr class="">
+                <td>' . $row->client_name . '</td>
+                <td>' . $row->count_pend . '</td>
+                </tr>';
+        }
+
         return response()->json(['displayfrom' => $displayfrom, 'displayto' => $displayto, 'total_items' => $total_items, 'status' => 1, 'data' => $records, 'pagination' => $pagination, 'msg' => 'This is matched data!', 'total_analytics' => $total_analytics]);
     }
 
-
     public function getPendingListClinet(Request $request)
     {
-
-        $user =  $request->session()->get('user');
-        $search = $request->search != '' ? $request->search : "%";
-        $All = DB::select("
-            SELECT 
-                CC.COMPLAINT_NO,  
-                CC.STATUS
+        $user = $request->session()->get('user');
+        $search = $request->search != '' ? $request->search : '%';
+        $All = SqlHelper::select('
+            SELECT
+                cc.complaint_number,
+                cc.status
             FROM
-                \"CUSTOMER_COMPLAINT\" CC 
-            WHERE 
-                TRUNC(CC.\"COMPL_DT\", 'MM') = TRUNC(SYSDATE, 'MM') 
-                AND CC.CUST_CD = :eng_cd
-                AND LOWER(CC.COMPLAINT_NO) LIKE '%' || LOWER(:search) || '%'
-            ORDER BY 
-                CC.COMPL_DT desc 
-        ", ['eng_cd' => $user->eng_cd, 'search' => mb_strtolower($search, 'UTF-8')]);
-
-
+                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
+            WHERE
+                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
+                AND cc.client_code = :user_code
+                AND '.SqlHelper::likeContains('cc.complaint_number', ':search').'
+            ORDER BY
+                cc.complaint_date desc
+        ', ['user_code' => $user->user_code, 'search' => mb_strtolower($search, 'UTF-8')]);
 
         $page = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = !empty($request->per_page) ? $request->per_page : 10;
+        $perPage = ! empty($request->per_page) ? $request->per_page : 10;
         $resultsCollection = collect($All);
         $currentPageItems = $resultsCollection->slice(($page - 1) * $perPage, $perPage)->all();
         $btl_datas = new LengthAwarePaginator(
@@ -217,7 +247,7 @@ class AuthController extends BaseController
         $displayfrom = ($currentPage - 1) * $request->per_page + 1;
         $displayto = ($currentPage - 1) * $request->per_page + $count;
         $pagination = '';
-        //display the pagination
+
         if ($number_of_page > 1) {
             $prv = $currentPage - 1;
             $next = $currentPage + 1;
@@ -250,7 +280,7 @@ class AuthController extends BaseController
                 <div class="col-sm-12 col-md-6">
                         <ul class="pagination">
                             <li class="paginate_button page-item last page-link">
-                            Showing ' . (int)$displayfrom  . ' of ' . ceil($total_items) . ' of  entries
+                            Showing ' . (int) $displayfrom . ' of ' . ceil($total_items) . ' of  entries
                             </li>
                         </ul>
                 </div>';
@@ -258,23 +288,24 @@ class AuthController extends BaseController
 
         if ($count == 0) {
             return response()->json(['status' => 0, 'data' => $btl_datas, 'pagination' => $pagination, 'msg' => 'Data Not Found!']);
-        } else {
-            $records = '';
-            $STATUS = [
-                'CL' => 'Cancel',
-                'CM' => 'Complete',
-                'HL' => 'Hold',
-                'PN' => 'Pending',
-                'SV' => 'Sent For Customer Verification',
-            ];
-            foreach ($btl_datas as $row) {
-                $link = base64_encode($row->complaint_no);
-                $records .= '<tr class="">
-                    <td><a href="/complaint/edit/' . $link . '">' . $row->complaint_no . '</a></td>
-                    <td>' . @$STATUS[$row->status] . '</td>
-                    </tr>';
-            }
         }
+
+        $records = '';
+        $STATUS = [
+            'CL' => 'Cancel',
+            'CM' => 'Complete',
+            'HL' => 'Hold',
+            'PN' => 'Pending',
+            'SV' => 'Sent For Customer Verification',
+        ];
+        foreach ($btl_datas as $row) {
+            $link = base64_encode($row->complaint_number);
+            $records .= '<tr class="">
+                <td><a href="/complaint/edit/' . $link . '">' . $row->complaint_number . '</a></td>
+                <td>' . @$STATUS[$row->status] . '</td>
+                </tr>';
+        }
+
         return response()->json(['displayfrom' => $displayfrom, 'displayto' => $displayto, 'total_items' => $total_items, 'status' => 1, 'data' => $records, 'pagination' => $pagination, 'msg' => 'This is matched data!']);
     }
 }

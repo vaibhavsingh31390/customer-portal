@@ -1,3 +1,3 @@
-<footer class="footer mt-1">
-    <p>Copyright © {{ date('Y') }} Mawai Infotech Ltd. All rights reserved</p>
+<footer class="footer portal-footer mt-1">
+    @include('include.brandCopyright')
 </footer>

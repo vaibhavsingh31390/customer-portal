@@ -3,106 +3,99 @@
 namespace App\Exports\Reports;
 
 use App\Models\CustomerComplaint;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use App\Support\SqlHelper;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 
 class ComplaintRegisterExcel implements FromCollection, WithHeadings, WithCustomStartCell
 {
+    public function collection()
+    {
+        if (request()->client_cd != '') {
+            $query = CustomerComplaint::where('client_code', request()->client_cd);
+        } else {
+            $query = CustomerComplaint::query();
+        }
+        if (request()->date_from != '' && request()->date_to != '') {
+            $query->whereBetween('complaint_date', [request()->date_from, request()->date_to]);
+        }
+        $data = $query->orderBy('complaint_date', 'DESC')->get();
+        $datas = [];
 
-	public function collection()
-	{
-		if (request()->client_cd != '') {
-			$query = CustomerComplaint::where('CUST_CD', request()->client_cd);
-		} else {
-			$query = CustomerComplaint::query();
-		}
-		if (request()->date_from != '' && request()->date_to != '') {
-			$query->whereBetween('COMPL_DT', [request()->date_from, request()->date_to]);
-		}
-		$data = $query->orderBy('COMPL_DT', 'DESC')->get();
-		$datas = [];
+        $complaintTypes = [
+            'DB_Object' => 'DB Object',
+            'Form' => 'Form',
+            'Graph' => 'Graph',
+            'Others' => 'Others',
+            'Report' => 'Report',
+            'Tables' => 'Tables',
+            'Views' => 'Views',
+        ];
+        $errorTypes = [
+            'DP' => 'Database Problem',
+            'NR' => 'New Requirement',
+            'OT' => 'Others',
+            'SP' => 'Software Problem',
+            'ST' => 'Support',
+            'UP' => 'User Problem',
+        ];
+        $statuses = [
+            'CL' => 'Cancel',
+            'CM' => 'Complete',
+            'HL' => 'Hold',
+            'PN' => 'Pending',
+            'SV' => 'Sent For Customer Verification',
+        ];
 
-		// Define the lookup arrays
-		$COMPL_TYPE = [
-			'DB_Object' => 'DB Object',
-			'Form' => 'Form',
-			'Graph' => 'Graph',
-			'Others' => 'Others',
-			'Report' => 'Report',
-			'Tables' => 'Tables',
-			'Views' => 'Views',
-		];
-		$ERROR_TYPE = [
-			'DP' => 'Database Problem',
-			'NR' => 'New Requirement',
-			'OT' => 'Others',
-			'SP' => 'Software Problem',
-			'ST' => 'Support',
-			'UP' => 'User Problem',
-		];
-		$COMPL_LEVEL = [
-			'C' => 'Critical',
-			'L' => 'Low',
-			'M' => 'Medium',
-		];
-		$STATUS = [
-			'CL' => 'Cancel',
-			'CM' => 'Complete',
-			'HL' => 'Hold',
-			'PN' => 'Pending',
-			'SV' => 'Sent For Customer Verification',
-		];
+        foreach ($data as $dt) {
+            $x = new \stdClass();
+            $moduleRow = SqlHelper::selectOne(
+                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' AND name = ?",
+                [$dt['module']],
+            );
+            $module = $moduleRow->name ?? '-';
 
-		foreach ($data as $dt) {
-			$x = new \stdClass();
-			// Query for MODULE_NAME
-			$moduleResult = DB::select(
-				"SELECT MODULE_TEXT FROM SAP_MODULE_DTL WHERE DEPT_MODULE='TERMS' AND MODULE_TEXT = ?",
-				[$dt['module']],
-			);
-			$module = !empty($moduleResult) ? $moduleResult[0]->module_text : '-';
+            $clientCode = $dt['client_code'];
+            $customerRow = SqlHelper::selectOne(
+                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
+                [$clientCode]
+            );
+            $x->complaint_number = $dt['complaint_number'];
+            $x->client_name = $customerRow->name ?? '-';
+            $x->status = $statuses[$dt['status']];
+            $x->complaint_date = ! empty($dt['complaint_date']) ? date('d-m-Y', strtotime($dt['complaint_date'])) : '-';
+            $x->module = $module;
+            $x->complaint_type = $complaintTypes[$dt['complaint_type']];
+            $x->error_type = $errorTypes[$dt['error_type']];
+            $x->problem_description = $dt['problem_description'];
+            $x->reason = $dt['reason'];
+            $x->action_taken = $dt['action_taken'];
+            $x->closed_date = ! empty($dt['closed_date']) ? date('d-m-Y', strtotime($dt['closed_date'])) : '-';
+            $x->contact_name = $dt['contact_name'];
+            $datas[] = $x;
+        }
 
-			$cust_cd = $dt['cust_cd'];
-			$customer_name =  DB::select("SELECT CLIENT_NAME FROM CELINT_MASTER WHERE ERP_VERT='TERMS' AND CLIENT_CD = '$cust_cd' ORDER BY 1");
-			$x->complaint_no = $dt['complaint_no'];
-			$x->cust_name = @$customer_name[0]->client_name;
-			$x->status =  $STATUS[$dt['status']];
-			$x->compl_dt = !empty($data->compl_dt) ? date('d-m-Y', strtotime($data->compl_dt)) : '-';
-			$x->module = $module;
-			$x->compl_type = $COMPL_TYPE[$dt['compl_type']];
-			$x->error_type =  $ERROR_TYPE[$dt['error_type']];
-			$x->problem_desc = $dt['problem_desc'];
-			$x->reason = $dt['reason'];
-			$x->action = $dt['action'];
-			$x->close_dt = !empty($data->close_dt) ? date('d-m-Y', strtotime($data->close_dt)) : '-';
-			$x->user_name = $dt['user_name'];
-			array_push($datas, $x);
-		}
+        return Collection::make($datas);
+    }
 
-		$collection = Collection::make($datas);
-		return $collection;
-	}
+    public function headings(): array
+    {
+        return [
+            ['Customer', request()->client_cd],
+            ['From', request()->date_from],
+            ['To', request()->date_to],
+            [''],
+            [
+                'Complaint No', 'Complaint Date', 'Client Name', 'Status', 'Module', 'Complaint Type', 'Error Type',
+                'Problem Description', 'Reason', 'Action Taken', 'Closed Date', 'Contact Name',
+            ],
+        ];
+    }
 
-	public function headings(): array
-	{
-		return [
-			['Customer', request()->client_cd],
-			['From', request()->date_from],
-			['To', request()->date_to],
-			[''],
-			[
-				'Complaint No', 'Compl Dt',  'Cust name', 'Status', 'Module', 'Compl Type', 'Error Type',
-				'Problem Desc',  'Reason', 'Action', 'Close Dt', 'User Name',
-			]
-		];
-	}
-
-
-	public function startCell(): string
-	{
-		return 'A2';
-	}
+    public function startCell(): string
+    {
+        return 'A2';
+    }
 }

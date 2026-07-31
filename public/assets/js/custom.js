@@ -1,25 +1,66 @@
 (function ($) {
     "use strict";
     jQuery(document).on("ready", function () {
-        // Side Menu Hide Show JS
-        $(".burger-menu").on("click", function () {
-            $(".burger-menu").toggleClass("toggle-menu");
-            // $(".navbar-brand").toggleClass("navbar-logo");
-            $(".sidemenu-area").toggleClass("sidemenu-toggle");
-            $(".sidemenu").toggleClass("hide-nav-title");
-            $(".main-content").toggleClass("hide-sidemenu");
+        // Side menu — portal shell
+        function setSidebarCollapsed(collapsed) {
+            $("body").toggleClass("portal-sidebar-collapsed", collapsed);
+            if (window.PortalUI && window.PortalUI.updateSidebarToggleIcon) {
+                window.PortalUI.updateSidebarToggleIcon(collapsed);
+            }
+        }
+
+        function syncSidebarState() {
+            var isMobile = window.innerWidth < 1200;
+            $("body").toggleClass("portal-shell--mobile", isMobile);
+            if (isMobile) {
+                setSidebarCollapsed(true);
+            } else {
+                $("body").removeClass("portal-sidebar-collapsed");
+                if (window.PortalUI && window.PortalUI.updateSidebarToggleIcon) {
+                    window.PortalUI.updateSidebarToggleIcon(false);
+                }
+            }
+        }
+
+        syncSidebarState();
+
+        if (window.PortalUI && window.PortalUI.updateSidebarToggleIcon) {
+            window.PortalUI.updateSidebarToggleIcon($("body").hasClass("portal-sidebar-collapsed"));
+        }
+
+        $(window).on("resize", function () {
+            syncSidebarState();
         });
 
-        // Burger menu click show toggle x class
-        $(".burger-menu").on("click", function () {
-            $(".burger-menu").toggleClass("x");
+        $("#sidebar-toggle").on("click", function () {
+            var collapsed = $("body").hasClass("portal-sidebar-collapsed");
+            setSidebarCollapsed(!collapsed);
+        });
+
+        $("#sidebar-toggle").on("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                $(this).trigger("click");
+            }
+        });
+
+        $("#portal-sidebar-backdrop").on("click", function () {
+            setSidebarCollapsed(true);
+        });
+
+        $(document).on("keydown", function (event) {
+            if (event.key === "Escape") {
+                setSidebarCollapsed(true);
+            }
         });
 
         // Tooltip JS
         $('[data-toggle="tooltip"]').tooltip();
 
-        // Feather Icon Js
-        feather.replace();
+        // Feather Icon Js (legacy — Lucide preferred)
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
 
         // FAQ Accordion Js
         $(".accordion")
@@ -68,8 +109,11 @@
 
         // Back To Top Button JS
         $("body").append(
-            '<div id="toTop"><i class="lni lni-chevron-up"></i></div>'
+            '<div id="toTop" aria-label="Back to top"><i data-lucide="chevron-up"></i></div>'
         );
+        if (window.PortalUI && window.PortalUI.initLucide) {
+            window.PortalUI.initLucide();
+        }
         $(window).scroll(function () {
             if ($(this).scrollTop() != 0) {
                 $("#toTop").fadeIn();

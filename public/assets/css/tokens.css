@@ -1,0 +1,195 @@
+/**
+ * MAWAI Customer Portal — Design Tokens
+ * Single source of truth for color, spacing, typography, radius, and shadows.
+ * Light mode: :root
+ * Dark mode:  [data-theme="dark"] or prefers-color-scheme (when not forced light)
+ */
+
+:root {
+  /* Primary — actions, links, active states */
+  --color-primary:        #2563EB;
+  --color-primary-hover:  #1D4ED8;
+  --color-primary-light:  #DBEAFE;
+
+  /* Neutrals */
+  --color-text:           #0F172A;
+  --color-text-muted:     #475569;
+  --color-border:         #E2E8F0;
+  --color-surface:        #FFFFFF;
+  --color-bg:             #F8FAFC;
+  --color-bg-muted:       #F1F5F9;
+
+  /* Semantic */
+  --color-success:        #16A34A;
+  --color-success-bg:     #DCFCE7;
+  --color-warning:        #D97706;
+  --color-warning-bg:     #FEF3C7;
+  --color-error:          #DC2626;
+  --color-error-bg:       #FEE2E2;
+  --color-info:           #0EA5E9;
+  --color-info-bg:        #E0F2FE;
+
+  /* Accent — use sparingly */
+  --color-accent:         #7C3AED;
+
+  /* Toast foreground (WCAG AA on semantic backgrounds) */
+  --color-toast-success-text: #14532D;
+  --color-toast-error-text:   #7F1D1D;
+
+  /* Spacing — 8px scale */
+  --space-1:  0.25rem;  /*  4px */
+  --space-2:  0.5rem;   /*  8px */
+  --space-3:  1rem;     /* 16px */
+  --space-4:  1.5rem;   /* 24px */
+  --space-5:  2rem;     /* 32px */
+  --space-6:  3rem;     /* 48px */
+
+  /* Radius */
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-resting: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-raised:  0 4px 12px rgba(15, 23, 42, 0.08);
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-size-xs:   0.75rem;   /* 12px */
+  --font-size-sm:   0.875rem;  /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-lg:   1.125rem;  /* 18px */
+  --font-size-xl:   1.25rem;   /* 20px */
+  --font-size-2xl:  1.5rem;    /* 24px */
+  --font-size-3xl:  1.875rem;  /* 30px */
+  --line-height-body: 1.5;
+  --line-height-tight: 1.25;
+
+  /* Motion */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+
+  /* Focus ring */
+  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.35);
+
+  /* Legacy aliases (consumed by style_child.css & existing markup) */
+  --primary-color: var(--color-surface);
+  --accent-color:  var(--color-primary);
+  --black-color:   var(--color-text);
+  --box--shadow:   var(--shadow-resting);
+  --border-radius: var(--radius-md);
+  --border-radius-input: var(--radius-sm);
+
+  /* App shell */
+  --portal-topnav-height: 64px;
+  --portal-sidebar-width: 240px;
+
+  /* Form controls */
+  --color-input-bg: var(--color-surface);
+  --color-input-border: var(--color-border);
+
+  /* Tables */
+  --color-table-header-bg: #F1F5F9;
+  --color-table-header-text: #64748B;
+  --color-table-header-border: #CBD5E1;
+  --color-table-row-hover: #F8FAFC;
+  --color-table-row-stripe: rgba(241, 245, 249, 0.55);
+
+  /* Select fields (native + Select2) */
+  --portal-select-height: 40px;
+  --portal-select-arrow-size: 1rem;
+  --portal-select-arrow-offset: 0.5rem;
+  --portal-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] {
+  --color-primary:        #3B82F6;
+  --color-primary-hover:  #60A5FA;
+  --color-primary-light:  #1E3A5F;
+
+  --color-text:           #F1F5F9;
+  --color-text-muted:     #94A3B8;
+  --color-border:         #334155;
+  --color-surface:        #1E293B;
+  --color-bg:             #0F172A;
+  --color-bg-muted:       #1E293B;
+
+  --color-success:        #4ADE80;
+  --color-success-bg:     #14532D;
+  --color-warning:        #FBBF24;
+  --color-warning-bg:     #78350F;
+  --color-error:          #F87171;
+  --color-error-bg:       #7F1D1D;
+  --color-info:           #38BDF8;
+  --color-info-bg:        #0C4A6E;
+
+  --color-accent:         #A78BFA;
+
+  --color-toast-success-text: #DCFCE7;
+  --color-toast-error-text:   #FEE2E2;
+
+  --shadow-resting: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-raised:  0 4px 12px rgba(0, 0, 0, 0.4);
+
+  --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.45);
+
+  --primary-color: var(--color-surface);
+  --accent-color:  var(--color-primary);
+  --black-color:   var(--color-text);
+
+  --color-table-header-bg: #0B1220;
+  --color-table-header-text: #94A3B8;
+  --color-table-header-border: #334155;
+  --color-table-row-hover: rgba(51, 65, 85, 0.35);
+  --color-table-row-stripe: rgba(15, 23, 42, 0.45);
+
+  --portal-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-primary:        #3B82F6;
+    --color-primary-hover:  #60A5FA;
+    --color-primary-light:  #1E3A5F;
+
+    --color-text:           #F1F5F9;
+    --color-text-muted:     #94A3B8;
+    --color-border:         #334155;
+    --color-surface:        #1E293B;
+    --color-bg:             #0F172A;
+    --color-bg-muted:       #1E293B;
+
+    --color-success:        #4ADE80;
+    --color-success-bg:     #14532D;
+    --color-warning:        #FBBF24;
+    --color-warning-bg:     #78350F;
+    --color-error:          #F87171;
+    --color-error-bg:       #7F1D1D;
+    --color-info:           #38BDF8;
+    --color-info-bg:        #0C4A6E;
+
+    --color-accent:         #A78BFA;
+
+    --color-toast-success-text: #DCFCE7;
+    --color-toast-error-text:   #FEE2E2;
+
+    --shadow-resting: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-raised:  0 4px 12px rgba(0, 0, 0, 0.4);
+
+    --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.45);
+
+    --primary-color: var(--color-surface);
+    --accent-color:  var(--color-primary);
+    --black-color:   var(--color-text);
+
+    --color-table-header-bg: #0B1220;
+    --color-table-header-text: #94A3B8;
+    --color-table-header-border: #334155;
+    --color-table-row-hover: rgba(51, 65, 85, 0.35);
+    --color-table-row-stripe: rgba(15, 23, 42, 0.45);
+
+    --portal-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+}

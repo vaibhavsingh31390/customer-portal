@@ -79,15 +79,17 @@
                 @foreach ($datas as $data)
                     <tr>
                         @php
-                            $customer_name = DB::select(
-                                "SELECT CLIENT_NAME FROM CELINT_MASTER WHERE ERP_VERT='TERMS' AND CLIENT_CD = '$data->cust_cd' ORDER BY 1",
+                            use App\Support\SqlHelper;
+
+                            $customerRow = SqlHelper::selectOne(
+                                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
+                                [$data->client_code]
                             );
-                            // Query for MODULE_NAME
-                            $moduleResult = DB::select(
-                                "SELECT MODULE_TEXT FROM SAP_MODULE_DTL WHERE DEPT_MODULE='TERMS' AND MODULE_TEXT = ?",
+                            $moduleRow = SqlHelper::selectOne(
+                                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' AND name = ?",
                                 [$data->module],
                             );
-                            $module = !empty($moduleResult) ? $moduleResult[0]->module_text : '-';
+                            $module = $moduleRow->name ?? '-';
 
                             // Define the lookup arrays
                             $COMPL_TYPE = [
@@ -120,18 +122,18 @@
                                 'SV' => 'Sent For Customer Verification',
                             ];
                         @endphp
-                        <td>{{ $data->complaint_no }}</td>
-                        <td>{{ !empty($data->compl_dt) ? date('d-m-Y', strtotime($data->compl_dt)) : '-' }}</td>
-                        <td>{{ @$customer_name[0]->client_name }}</td>
+                        <td>{{ $data->complaint_number }}</td>
+                        <td>{{ !empty($data->complaint_date) ? date('d-m-Y', strtotime($data->complaint_date)) : '-' }}</td>
+                        <td>{{ $customerRow->name ?? '-' }}</td>
                         <td>{{ $STATUS[$data->status] }}</td>
                         <td>{{ $module }}</td>
-                        <td>{{ $COMPL_TYPE[$data->compl_type] }}</td>
+                        <td>{{ $COMPL_TYPE[$data->complaint_type] }}</td>
                         <td>{{ $ERROR_TYPE[$data->error_type] }}</td>
-                        <td>{{ $data->problem_desc }}</td>
+                        <td>{{ $data->problem_description }}</td>
                         <td>{{ $data->reason }}</td>
-                        <td>{{ $data->action }}</td>
-                        <td>{{ !empty($data->close_dt) ? date('d-m-Y', strtotime($data->close_dt)) : '-' }}</td>
-                        <td>{{ $data->user_name }}</td>
+                        <td>{{ $data->action_taken }}</td>
+                        <td>{{ !empty($data->closed_date) ? date('d-m-Y', strtotime($data->closed_date)) : '-' }}</td>
+                        <td>{{ $data->contact_name }}</td>
                     </tr>
                 @endforeach
             </tbody>
