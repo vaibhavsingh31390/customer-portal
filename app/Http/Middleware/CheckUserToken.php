@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use App\Support\SqlHelper;
+use App\Support\UserRole;
 use Closure;
 
 class CheckUserToken
@@ -26,10 +27,10 @@ class CheckUserToken
             ]);
         }
 
-        if ($user->user_code && preg_match('/^[S]/', $user->user_code)) {
+        if (UserRole::isStaff($user->user_code)) {
             $nameRow = SqlHelper::selectOne(
-                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_ENGINEERS).' WHERE working_status = ? AND department = ? AND engineer_code = ? ORDER BY 1',
-                ['WK', 'SWE', $user->user_code]
+                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_ENGINEERS).' WHERE working_status = ? AND engineer_code = ? ORDER BY 1',
+                ['WK', $user->user_code]
             );
             $name = $nameRow->name ?? null;
         } else {
@@ -40,13 +41,8 @@ class CheckUserToken
             $name = $nameRow->name ?? null;
         }
 
-        if (! $request->session()->has('user')) {
-            $request->session()->put('user', $user);
-        }
-
-        if (! $request->session()->has('name')) {
-            $request->session()->put('name', $name);
-        }
+        $request->session()->put('user', $user);
+        $request->session()->put('name', $name);
 
         return $next($request);
     }

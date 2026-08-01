@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\UserRole;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -24,6 +25,18 @@ class TestUserSeeder extends Seeder
                     'status' => 'Y',
                 ]
             );
+
+            if (UserRole::isAdmin($account['user_code'])) {
+                DB::table('engineers')->updateOrInsert(
+                    ['engineer_code' => $account['user_code']],
+                    [
+                        'engineer_code' => $account['user_code'],
+                        'name' => $account['label'] ?? 'Portal Admin',
+                        'working_status' => 'WK',
+                        'department' => 'ADM',
+                    ]
+                );
+            }
         }
 
         if ($this->command) {

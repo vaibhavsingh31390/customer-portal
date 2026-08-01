@@ -8,13 +8,14 @@
 @endphp
 
 <div class="main-content d-flex flex-column portal-shell__main portal-main">
-    <form action="{{ route('register.complaint.export') }}" action2="{{ route('register.complaint.report') }}"
-        id="complaintForm" method="post" class="portal-form">
+    <form action="{{ route('complaint.export') }}" id="complaintForm" method="post" class="portal-form">
         @csrf
 
-        <x-page-header title="Complaint Register" subtitle="Search and export across all clients">
+        <x-page-header title="Complaints" :subtitle="$isStaff ? 'Search and manage all client complaints' : 'View and export your complaint records'">
             <x-slot:actions>
-                <x-button variant="ghost" :href="route('dashboard')" icon="home" class="portal-btn--icon-only" aria-label="Dashboard" />
+                <x-button variant="primary" :href="route('show.create.complaint')" icon="plus">
+                    Create Complaint
+                </x-button>
             </x-slot:actions>
         </x-page-header>
 
@@ -30,35 +31,38 @@
                             <label for="date_to">Date To</label>
                             <input type="date" id="date_to" name="date_to" class="form-control">
                         </div>
-                        <div class="form-group col-md-4">
-                            <label for="client_cd">Customer</label>
-                            <div class="portal-form__control">
-                                <select id="client_cd" name="client_cd" class="form-control portal-select2"
-                                    data-placeholder="Select customer…">
-                                    <option value=""></option>
-                                    @foreach ($clients as $client)
-                                        <option value="{{ $client->client_code }}">{{ $client->name }}</option>
-                                    @endforeach
-                                </select>
+                        @if ($isStaff)
+                            <div class="form-group col-md-4">
+                                <label for="client_cd">Customer</label>
+                                <div class="portal-form__control">
+                                    <select id="client_cd" name="client_cd" class="form-control portal-select2"
+                                        data-placeholder="All customers">
+                                        <option value=""></option>
+                                        @foreach ($clients as $client)
+                                            <option value="{{ $client->client_code }}">{{ $client->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
-                        </div>
+                        @else
+                            <input type="hidden" id="client_cd" name="client_cd"
+                                value="{{ $customer_name->client_code ?? Session::get('user')->user_code }}">
+                        @endif
                     </div>
                     <div class="actions">
                         <div class="left portal-actions-left">
-                            <button class="btn btn-secondary portal-btn" name="type" id="executeComplaintRegisterExport" type="submit" value="Excel" formtarget="_blank">
+                            <button class="btn btn-secondary portal-btn" name="type" type="submit" value="Excel" formtarget="_blank">
                                 <x-icon name="file-spreadsheet" :size="18" /><span class="portal-btn__label">Excel</span>
                             </button>
-                            <button class="btn btn-secondary portal-btn" name="type" id="executeComplaintRegisterExport" type="submit" value="PDF" formtarget="_blank">
+                            <button class="btn btn-secondary portal-btn" name="type" type="submit" value="PDF" formtarget="_blank">
                                 <x-icon name="file-text" :size="18" /><span class="portal-btn__label">PDF</span>
                             </button>
                         </div>
                         <div class="right portal-actions-right">
-                            <button class="btn btn-primary portal-btn" id="executeComplaintRegister" type="submit">
-                                <span class="portal-btn__label">Search</span>
-                                <span class="loader-btn portal-btn__spinner" aria-hidden="true"></span>
+                            <button class="btn btn-primary portal-btn" id="applyComplaintFilters" type="button">
+                                <span class="portal-btn__label">Apply Filters</span>
                             </button>
-                            <button class="btn btn-secondary portal-btn" id="resetFieldsRegister" type="button"
-                                onclick="document.getElementById('date_from').value=''; document.getElementById('date_to').value='';$('#client_cd').val(null).trigger('change');">
+                            <button class="btn btn-secondary portal-btn" id="resetComplaintFilters" type="button">
                                 <span class="portal-btn__label">Reset</span>
                             </button>
                         </div>
@@ -71,7 +75,7 @@
             <div class="col-lg-12 col-xl-12" id="left_parent">
                 <x-card title="Results">
                     @include('include.dataTable', [
-                        'action' => route('getTableData.support'),
+                        'action' => route('complaint.list'),
                         'headers' => $listHeaders,
                         'lengthCol' => 'col-md-2',
                     ])
@@ -79,4 +83,7 @@
             </div>
         </div>
     </form>
+
+    <div class="flex-grow-1"></div>
+    @include('include.footer')
 </div>

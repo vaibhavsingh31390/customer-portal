@@ -1,9 +1,36 @@
+@php
+    use App\Support\SqlHelper;
+
+    $complaintTypes = [
+        'DB_Object' => 'DB Object',
+        'Form' => 'Form',
+        'Graph' => 'Graph',
+        'Others' => 'Others',
+        'Report' => 'Report',
+        'Tables' => 'Tables',
+        'Views' => 'Views',
+    ];
+    $errorTypes = [
+        'DP' => 'Database Problem',
+        'NR' => 'New Requirement',
+        'OT' => 'Others',
+        'SP' => 'Software Problem',
+        'ST' => 'Support',
+        'UP' => 'User Problem',
+    ];
+    $statuses = [
+        'CL' => 'Cancel',
+        'CM' => 'Complete',
+        'HL' => 'Hold',
+        'PN' => 'Pending',
+        'SV' => 'Sent For Customer Verification',
+    ];
+@endphp
 <!DOCTYPE html>
 <html>
 
 <head>
     <style>
-        /* General styling */
         body {
             font-family: Arial, sans-serif;
             color: #000;
@@ -11,7 +38,6 @@
             padding: 0;
         }
 
-        /* Table styling */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -31,7 +57,6 @@
             size: A4 landscape;
         }
 
-        /* Header styling */
         header {
             position: fixed;
             text-align: center;
@@ -75,60 +100,25 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Replace with your Blade template foreach loop -->
                 @foreach ($datas as $data)
+                    @php
+                        $customerRow = SqlHelper::selectOne(
+                            'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
+                            [$data->client_code]
+                        );
+                        $moduleRow = SqlHelper::selectOne(
+                            'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' AND name = ?",
+                            [$data->module],
+                        );
+                    @endphp
                     <tr>
-                        @php
-                            use App\Support\SqlHelper;
-
-                            $customerRow = SqlHelper::selectOne(
-                                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_CLIENTS)." WHERE erp_vertical = 'TERMS' AND client_code = ? ORDER BY 1",
-                                [$data->client_code]
-                            );
-                            $moduleRow = SqlHelper::selectOne(
-                                'SELECT name FROM '.SqlHelper::table(SqlHelper::TABLE_SAP_MODULES)." WHERE department_module = 'TERMS' AND name = ?",
-                                [$data->module],
-                            );
-                            $module = $moduleRow->name ?? '-';
-
-                            // Define the lookup arrays
-                            $COMPL_TYPE = [
-                                'DB_Object' => 'DB Object',
-                                'Form' => 'Form',
-                                'Graph' => 'Graph',
-                                'Others' => 'Others',
-                                'Report' => 'Report',
-                                'Tables' => 'Tables',
-                                'Views' => 'Views',
-                            ];
-                            $ERROR_TYPE = [
-                                'DP' => 'Database Problem',
-                                'NR' => 'New Requirement',
-                                'OT' => 'Others',
-                                'SP' => 'Software Problem',
-                                'ST' => 'Support',
-                                'UP' => 'User Problem',
-                            ];
-                            $COMPL_LEVEL = [
-                                'C' => 'Critical',
-                                'L' => 'Low',
-                                'M' => 'Medium',
-                            ];
-                            $STATUS = [
-                                'CL' => 'Cancel',
-                                'CM' => 'Complete',
-                                'HL' => 'Hold',
-                                'PN' => 'Pending',
-                                'SV' => 'Sent For Customer Verification',
-                            ];
-                        @endphp
                         <td>{{ $data->complaint_number }}</td>
                         <td>{{ !empty($data->complaint_date) ? date('d-m-Y', strtotime($data->complaint_date)) : '-' }}</td>
                         <td>{{ $customerRow->name ?? '-' }}</td>
-                        <td>{{ $STATUS[$data->status] }}</td>
-                        <td>{{ $module }}</td>
-                        <td>{{ $COMPL_TYPE[$data->complaint_type] }}</td>
-                        <td>{{ $ERROR_TYPE[$data->error_type] }}</td>
+                        <td>{{ $statuses[$data->status] ?? $data->status }}</td>
+                        <td>{{ $moduleRow->name ?? $data->module ?? '-' }}</td>
+                        <td>{{ $complaintTypes[$data->complaint_type] ?? $data->complaint_type }}</td>
+                        <td>{{ $errorTypes[$data->error_type] ?? $data->error_type }}</td>
                         <td>{{ $data->problem_description }}</td>
                         <td>{{ $data->reason }}</td>
                         <td>{{ $data->action_taken }}</td>
@@ -139,9 +129,6 @@
             </tbody>
         </table>
     </main>
-    <footer>
-        {{-- Page {PAGENO} --}}
-    </footer>
 </body>
 
 </html>

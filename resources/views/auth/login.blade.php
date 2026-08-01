@@ -37,22 +37,24 @@
                         </button>
                     </form>
 
-                    @env('local')
                     @if ($testMode)
                         <div class="portal-test-panel test-mode-panel">
                             <span class="portal-test-panel__badge test-mode-badge">Test Mode</span>
                             <p class="portal-test-panel__hint">Quick login with seeded test accounts:</p>
                             @foreach ($testAccounts as $account)
-                                <button type="button" class="portal-test-login-btn test-login-btn"
+                                <button type="button"
+                                    class="portal-test-login-btn test-login-btn{{ ($account['role'] ?? '') === 'admin' ? ' portal-test-login-btn--admin' : '' }}"
                                     data-username="{{ $account['username'] }}"
                                     data-password="{{ $account['password'] }}">
                                     <strong>{{ $account['label'] }}</strong>
+                                    @if (($account['role'] ?? '') === 'admin')
+                                        <span class="portal-test-login-btn__role">Admin</span>
+                                    @endif
                                     <span>{{ $account['username'] }} / {{ $account['password'] }} — {{ $account['description'] }}</span>
                                 </button>
                             @endforeach
                         </div>
                     @endif
-                    @endenv
                 </div>
             </div>
         </div>
@@ -60,7 +62,6 @@
 @endsection
 
 @section('scripts')
-    @env('local')
     @if ($testMode ?? false)
         <script>
             document.querySelectorAll('.test-login-btn').forEach(function (button) {
@@ -72,7 +73,6 @@
             });
         </script>
     @endif
-    @endenv
 
     @if ($errors->any())
         @foreach ($errors->all() as $error)

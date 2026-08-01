@@ -16,7 +16,7 @@ class AuthController extends BaseController
 
     public function showLoginForm()
     {
-        $testMode = app()->environment('local') && config('test.enabled');
+        $testMode = config('test.enabled');
 
         return view('auth.login', [
             'testMode' => $testMode,
@@ -30,6 +30,13 @@ class AuthController extends BaseController
 
         return collect(config('test.accounts', []))
             ->map(fn (array $account) => array_merge($account, ['password' => $password]))
+            ->sortBy(fn (array $account) => match ($account['role'] ?? '') {
+                'admin' => 0,
+                'client' => 1,
+                'support' => 2,
+                default => 3,
+            })
+            ->values()
             ->all();
     }
 

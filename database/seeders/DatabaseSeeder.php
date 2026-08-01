@@ -11,7 +11,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         if (! $this->command) {
-            $this->callProductionSeeders();
+            if (config('test.enabled')) {
+                $this->callTestSeeders();
+            } else {
+                $this->callProductionSeeders();
+            }
 
             return;
         }

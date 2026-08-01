@@ -13,11 +13,20 @@ return [
      */
     'accounts' => [
         [
+            'username' => 'testadmin',
+            'user_code' => 'A000',
+            'email' => 'admin@heyvai.dev',
+            'label' => 'Admin',
+            'description' => 'Portal administrator — manage users & clients',
+            'role' => 'admin',
+        ],
+        [
             'username' => 'client1',
             'user_code' => 'C001',
             'email' => 'client1@acme.com',
             'label' => 'Client 1',
             'description' => 'Acme Logistics',
+            'role' => 'client',
         ],
         [
             'username' => 'client2',
@@ -25,6 +34,7 @@ return [
             'email' => 'client2@bright.com',
             'label' => 'Client 2',
             'description' => 'Bright Retail',
+            'role' => 'client',
         ],
         [
             'username' => 'support1',
@@ -32,6 +42,7 @@ return [
             'email' => 'support1@heyvai.dev',
             'label' => 'Support 1',
             'description' => 'Rahul Sharma',
+            'role' => 'support',
         ],
         [
             'username' => 'support2',
@@ -39,6 +50,7 @@ return [
             'email' => 'support2@heyvai.dev',
             'label' => 'Support 2',
             'description' => 'Priya Patel',
+            'role' => 'support',
         ],
     ],
 

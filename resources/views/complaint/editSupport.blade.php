@@ -105,12 +105,17 @@
                                     <label for="P3_STATUS_TYPE">Status</label>
                                     <select id="P3_STATUS_TYPE" name="P3_STATUS_TYPE" class="form-control">
                                         <option value=""></option>
-                                        <option value="CL" @if ($data->status === 'CL') selected @endif>Cancel</option>
-                                        <option value="CM" @if ($data->status === 'CM') selected @endif>Complete</option>
                                         <option value="HL" @if ($data->status === 'HL') selected @endif>Hold</option>
                                         <option value="PN" @if ($data->status === 'PN') selected @endif>Pending</option>
                                         <option value="SV" @if ($data->status === 'SV') selected @endif>Sent For Customer Verification</option>
+                                        @if ($isAdmin ?? false)
+                                            <option value="CL" @if ($data->status === 'CL') selected @endif>Cancel</option>
+                                            <option value="CM" @if ($data->status === 'CM') selected @endif>Complete</option>
+                                        @endif
                                     </select>
+                                    @if (! ($isAdmin ?? false))
+                                        <small class="form-text text-muted">Only admin can mark complete/cancel here. Use the thread to communicate with the client.</small>
+                                    @endif
                                 </div>
                                 <div class="form-group col-md-4">
                                     <label for="P8_TIME_TAKEN">Time Taken (hrs)</label>
@@ -173,6 +178,7 @@
                                 <div class="form-group col-md-12">
                                     <label for="P3_MAWAI_REMARKS">Remarks For Customer</label>
                                     <textarea id="P3_MAWAI_REMARKS" name="P3_MAWAI_REMARKS" class="form-control" maxlength="500">{{ $data->internal_remarks }}</textarea>
+                                    <small class="form-text text-muted">Or post as a threaded remark below (recommended for audit trail).</small>
                                 </div>
                             </div>
                         </div>
@@ -181,4 +187,6 @@
             </div>
         </div>
     </form>
+
+    @include('complaint._thread')
 </div>

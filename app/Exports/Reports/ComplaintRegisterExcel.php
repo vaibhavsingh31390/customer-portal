@@ -4,6 +4,7 @@ namespace App\Exports\Reports;
 
 use App\Models\CustomerComplaint;
 use App\Support\SqlHelper;
+use App\Support\UserRole;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
@@ -13,8 +14,14 @@ class ComplaintRegisterExcel implements FromCollection, WithHeadings, WithCustom
 {
     public function collection()
     {
-        if (request()->client_cd != '') {
-            $query = CustomerComplaint::where('client_code', request()->client_cd);
+        $user = request()->session()->get('user');
+        $userCode = $user->user_code ?? '';
+        $clientCode = request()->client_cd;
+
+        if (UserRole::isClient($userCode)) {
+            $query = CustomerComplaint::where('client_code', $userCode);
+        } elseif ($clientCode != '') {
+            $query = CustomerComplaint::where('client_code', $clientCode);
         } else {
             $query = CustomerComplaint::query();
         }

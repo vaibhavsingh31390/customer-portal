@@ -1,7 +1,7 @@
 @php
     $items = $items ?? [
         ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'layout-dashboard', 'pattern' => 'dashboard'],
-        ['route' => 'register.complaint', 'label' => 'Complaint Register', 'icon' => 'clipboard-list', 'pattern' => 'register.complaint'],
+        ['route' => 'complaint', 'label' => 'Complaints', 'icon' => 'inbox', 'pattern' => 'complaint'],
     ];
 @endphp
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomerComplaint extends Model
 {
@@ -49,4 +50,10 @@ class CustomerComplaint extends Model
         'contact_email',
         'email_send_status',
     ];
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(ComplaintMessage::class, 'complaint_number', 'complaint_number')
+            ->orderBy('created_at');
+    }
 }

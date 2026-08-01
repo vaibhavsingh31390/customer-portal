@@ -10,6 +10,7 @@ class EngMasterSeeder extends Seeder
     public function run(): void
     {
         $engineers = [
+            ['engineer_code' => 'A000', 'name' => 'Portal Admin', 'working_status' => 'WK', 'department' => 'ADM'],
             ['engineer_code' => 'S001', 'name' => 'Rahul Sharma', 'working_status' => 'WK', 'department' => 'SWE'],
             ['engineer_code' => 'S002', 'name' => 'Priya Patel', 'working_status' => 'WK', 'department' => 'SWE'],
             ['engineer_code' => 'S003', 'name' => 'Amit Kumar', 'working_status' => 'WK', 'department' => 'SWE'],

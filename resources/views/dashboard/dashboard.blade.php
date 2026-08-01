@@ -3,7 +3,11 @@
 @section('title', 'Dashboard')
 
 @section('content')
-    @if (Session::get('user')->user_code && preg_match('/^[S]/', Session::get('user')->user_code))
+    @php use App\Support\UserRole; @endphp
+    @if (UserRole::isAdmin(Session::get('user')->user_code))
+        @include('include.sidebarAdmin')
+        @include('include.mainSupport')
+    @elseif (UserRole::isSupport(Session::get('user')->user_code))
         @include('include.sidebarSupport')
         @include('include.mainSupport')
     @else

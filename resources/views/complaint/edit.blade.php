@@ -5,7 +5,7 @@
     <form action="{{ route('save.edit.complaint', ['id' => base64_encode($data->complaint_number)]) }}" id="complaintForm"
         method="post" enctype="multipart/form-data" class="portal-form">
         @csrf
-        @include('include.formHeader', ['title' => 'Complaint Edit', 'subtitle' => 'Update complaint details'])
+        @include('include.formHeader', ['title' => 'Complaint Edit', 'subtitle' => 'View details and use the thread to reply or close', 'showSave' => false])
 
         <div class="row">
             <div class="col-xl-12">
@@ -107,7 +107,8 @@
                                 </div>
                                 <div class="form-group col-md-12">
                                     <label for="P3_MAWAI_REMARKS">Remarks For Customer</label>
-                                    <textarea id="P3_MAWAI_REMARKS" name="P3_MAWAI_REMARKS" class="form-control disabled" maxlength="500">{{ $data->internal_remarks }}</textarea>
+                                    <textarea id="P3_MAWAI_REMARKS" name="P3_MAWAI_REMARKS" class="form-control disabled" maxlength="500" readonly>{{ $data->internal_remarks }}</textarea>
+                                    <small class="form-text text-muted">Post customer-facing remarks in the communication thread below.</small>
                                 </div>
                             </div>
                         </div>
@@ -116,4 +117,6 @@
             </div>
         </div>
     </form>
+
+    @include('complaint._thread')
 </div>

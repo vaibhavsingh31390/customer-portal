@@ -6,8 +6,9 @@
 @endsection
 
 @section('content')
-    @if (Session::get('user')->user_code && preg_match('/^[S]/', Session::get('user')->user_code))
-        @include('include.sidebarSupport')
+    @php use App\Support\UserRole; @endphp
+    @if (UserRole::isStaff(Session::get('user')->user_code))
+        @include(UserRole::isAdmin(Session::get('user')->user_code) ? 'include.sidebarAdmin' : 'include.sidebarSupport')
         @include('complaint.createSupport')
     @else
         @include('include.sidebar')
