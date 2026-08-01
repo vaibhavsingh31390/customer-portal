@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 {{-- Design tokens (load first) --}}
-<link rel="stylesheet" href="{{ asset('assets/css/tokens.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/css/tokens.css') }}?v={{ file_exists(public_path('assets/css/tokens.css')) ? filemtime(public_path('assets/css/tokens.css')) : time() }}">
 
 {{-- Vendor CSS --}}
 <link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">
@@ -30,8 +30,14 @@
 <link rel="stylesheet" href="{{ asset('assets/css/select2-bootstrap.css') }}">
 
 {{-- App overrides (load last among stylesheets) --}}
-<link rel="stylesheet" href="{{ asset('assets/css/style_child.css') }}">
-<link rel="stylesheet" href="{{ asset('assets/css/app.css') }}">
+@php
+    $assetVersion = static function (string $path): string {
+        $full = public_path($path);
+        return file_exists($full) ? (string) filemtime($full) : (string) time();
+    };
+@endphp
+<link rel="stylesheet" href="{{ asset('assets/css/style_child.css') }}?v={{ $assetVersion('assets/css/style_child.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/css/app.css') }}?v={{ $assetVersion('assets/css/app.css') }}">
 
 {{-- Favicon (generated from heyvai.dev logo) --}}
 <link rel="icon" href="{{ asset('favicon.png') }}" type="image/png" sizes="32x32">

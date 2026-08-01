@@ -129,6 +129,6 @@
         });
     </script>
 
-    <script src="{{ asset('assets/js/complaint-thread.js') }}"></script>
+    <script src="{{ asset('assets/js/complaint-thread.js') }}?v={{ file_exists(public_path('assets/js/complaint-thread.js')) ? filemtime(public_path('assets/js/complaint-thread.js')) : time() }}"></script>
 
 @endsection

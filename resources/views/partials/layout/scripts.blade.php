@@ -9,8 +9,8 @@
     <script src="{{ asset('assets/js/apex-charts/apexcharts.min.js') }}"></script>
 @endif
 
-<script src="{{ asset('assets/js/custom.js') }}"></script>
-<script src="{{ asset('assets/js/ui.js') }}"></script>
+<script src="{{ asset('assets/js/custom.js') }}?v={{ file_exists(public_path('assets/js/custom.js')) ? filemtime(public_path('assets/js/custom.js')) : time() }}"></script>
+<script src="{{ asset('assets/js/ui.js') }}?v={{ file_exists(public_path('assets/js/ui.js')) ? filemtime(public_path('assets/js/ui.js')) : time() }}"></script>
 <script src="{{ asset('assets/js/select2.min.js') }}"></script>
 <script src="{{ asset('assets/js/toastify-js.js') }}"></script>
 
