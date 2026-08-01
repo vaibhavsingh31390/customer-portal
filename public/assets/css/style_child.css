@@ -26,33 +26,18 @@
     min-height: 320px;
 }
 
-.loader-wrapper {
+.loader-wrapper,
+.portal-table-loader {
     min-height: 50svh;
     display: none;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
 }
 
-.loader-table {
-    width: 20px;
-    height: 20px;
-    border: 3px solid var(--accent-color);
-    border-bottom-color: transparent;
-    border-radius: 50%;
-    display: inline-block;
-    box-sizing: border-box;
-    animation: rotation 1s linear infinite;
-}
-
+/* Legacy class aliases — use portal-spinner in markup */
+.loader-table,
 .loader-btn {
-    width: 14px;
-    height: 14px;
-    border: 3px solid currentColor;
-    border-bottom-color: transparent;
-    border-radius: 50%;
     display: none;
-    box-sizing: border-box;
-    animation: rotation 1s linear infinite;
 }
 
 #submitComplaint {

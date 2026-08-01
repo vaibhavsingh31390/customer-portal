@@ -22,6 +22,15 @@
             $(document).ready(function() {
                 if (window.PortalUI && window.PortalUI.initSelect2) {
                     window.PortalUI.initSelect2('#client_cd');
+                    window.PortalUI.initSelect2('#status_cd');
+                }
+            });
+        </script>
+    @else
+        <script>
+            $(document).ready(function() {
+                if (window.PortalUI && window.PortalUI.initSelect2) {
+                    window.PortalUI.initSelect2('#status_cd');
                 }
             });
         </script>
@@ -38,14 +47,6 @@
         const listUrl = @json(route('complaint.list'));
         const emptyColspan = 11;
 
-        $(document).ajaxStart(function() {
-            $('.loader-wrapper').css('display', 'flex');
-            $('.table-responsive').css('display', 'none');
-        }).ajaxStop(function() {
-            $('.loader-wrapper').css('display', 'none');
-            $('.table-responsive').css('display', 'block');
-        });
-
         function fetchComplaints(page) {
             $.ajaxSetup({
                 headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
@@ -56,6 +57,7 @@
                 url: listUrl,
                 data: {
                     client_cd: $('#client_cd').val() || '',
+                    status_cd: $('#status_cd').val() || '',
                     date_from: $('#date_from').val(),
                     date_to: $('#date_to').val(),
                     page: page,
@@ -98,6 +100,7 @@
         $('#resetComplaintFilters').on('click', function() {
             $('#date_from').val('');
             $('#date_to').val('');
+            $('#status_cd').val('').trigger('change');
             @if ($isStaff)
                 $('#client_cd').val(null).trigger('change');
             @endif

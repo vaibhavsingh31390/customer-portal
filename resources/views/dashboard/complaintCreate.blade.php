@@ -24,12 +24,6 @@
                 window.PortalUI.initSelect2('.portal-select2');
             }
 
-            $(document).ajaxStart(function() {
-                $('.loader-btn').css('display', 'inline-block');
-            }).ajaxStop(function() {
-                $('.loader-btn').css('display', 'none');
-            });
-
             $('#backButton').click(function() {
                 history.back();
             });
@@ -113,10 +107,7 @@
                         contentType: false,
                         success: function(response) {
                             if (response.type) {
-                                showToast(response.message, true);
-                                setTimeout(() => {
-                                    location.reload();
-                                }, 3000);
+                                redirectWithToast(@json(route('dashboard')), response.message, true);
                             } else {
                                 showToast(response.message, false);
                             }

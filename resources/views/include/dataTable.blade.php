@@ -20,9 +20,9 @@
         </div>
     </div>
 
-    <div class="loader-wrapper">
+    <div class="loader-wrapper portal-table-loader" aria-live="polite" aria-busy="false">
+        <x-loader variant="table" label="Loading results" />
         <x-skeleton-table :rows="6" :cols="count($headers) ?: 4" class="portal-skeleton-table--block" />
-        <div class="loader-table" aria-label="Loading"></div>
     </div>
 
     <div class="table-responsive portal-table-wrap">

@@ -33,7 +33,7 @@
                         </div>
                         <button type="submit" class="btn btn-primary portal-btn portal-auth__submit w-100">
                             <span class="portal-btn__label">Log In</span>
-                            <span class="loader-btn portal-btn__spinner" aria-hidden="true"></span>
+                            <span class="portal-dots-loader portal-btn__spinner loader-btn" aria-hidden="true"><span></span><span></span><span></span></span>
                         </button>
                     </form>
 

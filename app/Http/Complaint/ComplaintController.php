@@ -7,6 +7,7 @@ use App\Mail\ComplaintCreatedMail;
 use App\Models\ComplaintMessage;
 use App\Models\CustomerComplaint;
 use App\Support\ComplaintAccess;
+use App\Support\ComplaintStatus;
 use App\Support\SqlHelper;
 use App\Support\UserRole;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -56,6 +57,8 @@ class ComplaintController extends BaseController
             $query->whereBetween('complaint_date', [$request->date_from, $request->date_to]);
         }
 
+        $query = ComplaintStatus::applyFilter($query, $request->input('status_cd'));
+
         $columns = Schema::getColumnListing((new CustomerComplaint)->getTable());
         if ($search) {
             $query->where(function (Builder $q) use ($columns, $search) {
@@ -67,7 +70,7 @@ class ComplaintController extends BaseController
         }
 
         $db_data = $query->orderBy('complaint_date', 'DESC')
-            ->orderBy($request->input('sorting', 'complaint_number'), $request->input('order', 'DESC'))
+            ->orderBy($this->resolveSortColumn($request->input('sorting')), $this->resolveSortOrder($request->input('order')))
             ->paginate($request->input('per_page', 10));
 
         $count = $db_data->count();
@@ -135,18 +138,21 @@ class ComplaintController extends BaseController
                 [$assignedTo]
             );
             $assignedLabel = $assignedTo ? " ($assignedTo)" : '';
-            $records .= '<tr class="">
-                <td><a href="/complaint/edit/' . $link . '">' . $row['complaint_number'] . '</a></td>
-                <td>' . (! empty($row['complaint_date']) ? date('d-m-Y', strtotime($row['complaint_date'])) : '-') . '</td>
-                <td>' . $clientCode . '</td>
-                <td style="min-width: 200px;">' . @$customer_name[0]->name . '</td>
-                <td>' . $row['status'] . '</td>
-                <td>' . $row['module'] . '</td>
-                <td>' . $row['complaint_type'] . '</td>
-                <td>' . $row['error_type'] . '</td>
-                <td' . $style . '>' . $row['problem_description'] . '</td>
-                <td>' . (! empty($row['closed_date']) ? date('d-m-Y', strtotime($row['closed_date'])) : '-') . '</td>
-                <td>' . @$assignto[0]->name . $assignedLabel . '</td>
+            $statusHtml = ComplaintStatus::tableBadgeHtml($row['status']);
+            $rowClass = ComplaintStatus::rowClass($row['status']);
+            $complaintNumber = e($row['complaint_number']);
+            $records .= '<tr class="'.$rowClass.'">
+                <td><a href="/complaint/edit/'.$link.'" class="portal-table__complaint-link">'.$complaintNumber.'</a></td>
+                <td>'.(! empty($row['complaint_date']) ? date('d-m-Y', strtotime($row['complaint_date'])) : '-').'</td>
+                <td>'.e($clientCode).'</td>
+                <td>'.e(@$customer_name[0]->name).'</td>
+                <td class="portal-table__status">'.$statusHtml.'</td>
+                <td>'.e($row['module']).'</td>
+                <td>'.e($row['complaint_type']).'</td>
+                <td>'.e($row['error_type']).'</td>
+                <td'.$style.'>'.e($row['problem_description']).'</td>
+                <td>'.(! empty($row['closed_date']) ? date('d-m-Y', strtotime($row['closed_date'])) : '-').'</td>
+                <td>'.e(@$assignto[0]->name).$assignedLabel.'</td>
                 </tr>';
         }
 
@@ -172,6 +178,7 @@ class ComplaintController extends BaseController
             if ($request->date_from != '' && $request->date_to != '') {
                 $query->whereBetween('complaint_date', [$request->date_from, $request->date_to]);
             }
+            $query = ComplaintStatus::applyFilter($query, $request->input('status_cd'));
             if ($search) {
                 $query->where('complaint_number', 'like', "%{$search}%");
             }
@@ -212,39 +219,42 @@ class ComplaintController extends BaseController
 
     public function saveCreateComplaints(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'P3_COMPL_DT' => 'required',
-        ]);
+        $user = $request->session()->get('user');
+        $userCode = $user->user_code ?? '';
+        $isStaff = UserRole::isStaff($userCode);
+
+        $rules = [
+            'P3_COMPL_DT' => 'required|date',
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json(['type' => 0, 'message' => $validator->errors()->all()]);
         }
 
+        $clientCode = $this->resolveClientCodeFromRequest($request, $userCode);
+
+        if ($clientCode === null || $clientCode === '') {
+            $message = $isStaff ? 'Please select a customer.' : 'Unable to identify your client account.';
+
+            return response()->json(['type' => 0, 'message' => [$message]]);
+        }
+
+        $clientValidator = Validator::make(
+            ['client_code' => $clientCode],
+            ['client_code' => 'required|exists:clients,client_code']
+        );
+
+        if ($clientValidator->fails()) {
+            return response()->json(['type' => 0, 'message' => $clientValidator->errors()->all()]);
+        }
+
         DB::beginTransaction();
 
         try {
-            $complaintNumber = SqlHelper::selectOne(SqlHelper::genComplaintNoQuery())?->data;
-
-            $data = [
-                'complaint_number' => $complaintNumber,
-                'complaint_date' => $request->input('P3_COMPL_DT'),
-                'client_code' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
-                'module' => $request->input('P3_MODULE'),
-                'complaint_type' => $request->input('P3_COMPL_TYPE'),
-                'error_type' => $request->input('P3_ERROR_TYPE'),
-                'problem_description' => $request->input('P3_PROBLEM_DESC'),
-                'priority' => $request->input('P3_COMPL_LEVEL'),
-                'status' => $request->input('P3_STATUS_TYPE'),
-                'internal_remarks' => $request->input('P3_MAWAI_REMARKS'),
-                'contact_name' => $request->input('P3_USER_NAME'),
-                'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
-                'time_taken' => $request->input('P8_TIME_TAKEN'),
-                'closed_date' => $request->input('P3_CLOSE_DT_TYPE'),
-                'assigned_to' => $request->input('P8_ASSIGN_TO'),
-                'changed_by' => $request->input('P8_CHANGE_DONE_BY'),
-                'reason' => $request->input('P8_REASON'),
-                'action_taken' => $request->input('P8_ACTION'),
-            ];
+            $complaintNumber = $this->nextComplaintNumber();
+            $data = $this->buildCreateComplaintPayload($request, $userCode, $clientCode, $complaintNumber);
 
             if ($request->hasFile('P3_UPLOAD')) {
                 $file = $request->file('P3_UPLOAD');
@@ -264,7 +274,6 @@ class ComplaintController extends BaseController
                 'id' => 'COMP-' . str_replace(['CP', '-'], '', $complaintNumber),
             ]));
 
-            $user = $request->session()->get('user');
             $this->storeMessage(
                 $complaintNumber,
                 $user->user_code,
@@ -276,19 +285,26 @@ class ComplaintController extends BaseController
 
             DB::commit();
 
-            $mailTo = $request->input('P3_CONTACT_MAIL_ID');
-            $cc = env('MAIL_CC');
-            if ($mailTo != '') {
-                $user = $request->session()->get('user');
-                if (! UserRole::isStaff($user->user_code)) {
-                    $mailTo = env('MAIL_CC');
-                    $cc = env('P3_CONTACT_MAIL_ID');
+            $mailTo = trim((string) $request->input('P3_CONTACT_MAIL_ID'));
+            $cc = null;
+
+            if ($isStaff) {
+                $cc = env('MAIL_CC') ?: null;
+            } elseif (env('MAIL_CC')) {
+                $mailTo = env('MAIL_CC');
+                $cc = $request->input('P3_CONTACT_MAIL_ID') ?: null;
+            }
+
+            if ($mailTo !== '') {
+                try {
+                    $email = Mail::to($mailTo);
+                    if (! empty($cc)) {
+                        $email->cc($cc);
+                    }
+                    $email->send(new ComplaintCreatedMail($data));
+                } catch (\Throwable $e) {
+                    report($e);
                 }
-                $email = Mail::to($mailTo);
-                if (! empty($cc)) {
-                    $email->cc($cc);
-                }
-                $email->send(new ComplaintCreatedMail($data));
             }
 
             return response()->json(['type' => 1, 'message' => 'Complaint created successfully.']);
@@ -480,19 +496,23 @@ class ComplaintController extends BaseController
     public function saveEditComplaints(Request $request, $id)
     {
         $complaint = $this->findComplaintOrFail($request, $id);
-        $id = $complaint->complaint_number;
+
+        $user = $request->session()->get('user');
+        $userCode = $user->user_code ?? '';
+
+        if (UserRole::isClient($userCode)) {
+            return response()->json(['type' => 0, 'message' => 'Use the communication thread to reply or close this ticket.']);
+        }
 
         $validator = Validator::make($request->all(), [
-            'P3_COMPL_DT' => 'required',
+            'P3_COMPL_DT' => 'required|date',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['type' => 0, 'message' => $validator->errors()->all()]);
         }
 
-        $user = $request->session()->get('user');
-        $userCode = $user->user_code ?? '';
-        $newStatus = $request->input('P3_STATUS_TYPE');
+        $newStatus = $request->input('P3_STATUS_TYPE') ?: $complaint->status;
 
         if (in_array($newStatus, ['CM', 'CL'], true) && ! UserRole::isAdmin($userCode)) {
             return response()->json([
@@ -501,39 +521,25 @@ class ComplaintController extends BaseController
             ]);
         }
 
-        if (UserRole::isClient($userCode)) {
-            return response()->json(['type' => 0, 'message' => 'Use the communication thread to reply or close this ticket.']);
+        $clientCode = $this->resolveClientCodeFromRequest($request, $userCode, $complaint->client_code);
+
+        if ($clientCode === null || $clientCode === '') {
+            return response()->json(['type' => 0, 'message' => ['Please select a customer.']]);
+        }
+
+        $clientValidator = Validator::make(
+            ['client_code' => $clientCode],
+            ['client_code' => 'required|exists:clients,client_code']
+        );
+
+        if ($clientValidator->fails()) {
+            return response()->json(['type' => 0, 'message' => $clientValidator->errors()->all()]);
         }
 
         DB::beginTransaction();
 
         try {
-            $updates = [
-                'complaint_date' => $request->input('P3_COMPL_DT'),
-                'client_code' => $request->input('P3_CUST_CD') ?? $request->input('P8_CUST_NAME'),
-                'module' => $request->input('P3_MODULE'),
-                'complaint_type' => $request->input('P3_COMPL_TYPE'),
-                'error_type' => $request->input('P3_ERROR_TYPE'),
-                'problem_description' => $request->input('P3_PROBLEM_DESC'),
-                'priority' => $request->input('P3_COMPL_LEVEL'),
-                'status' => $newStatus,
-                'contact_name' => $request->input('P3_USER_NAME'),
-                'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
-                'time_taken' => $request->input('P8_TIME_TAKEN'),
-                'assigned_to' => $request->input('P8_ASSIGN_TO'),
-                'changed_by' => $request->input('P8_CHANGE_DONE_BY'),
-            ];
-
-            if (UserRole::isAdmin($userCode) && in_array($newStatus, ['CM', 'CL'], true)) {
-                $updates['closed_date'] = $request->input('P3_CLOSE_DT_TYPE') ?: now()->toDateString();
-            } elseif (! in_array($newStatus, ['CM', 'CL'], true)) {
-                $updates['internal_remarks'] = $request->input('P3_MAWAI_REMARKS');
-                $updates['reason'] = $request->input('P8_REASON');
-                $updates['action_taken'] = $request->input('P8_ACTION');
-                $updates['closed_date'] = $request->input('P3_CLOSE_DT_TYPE');
-            }
-
-            $complaint->update($updates);
+            $complaint->update($this->buildUpdateComplaintPayload($request, $userCode, $clientCode, $newStatus));
 
             DB::commit();
 
@@ -595,6 +601,142 @@ class ComplaintController extends BaseController
                 'action'
             );
         }
+    }
+
+    protected function resolveClientCodeFromRequest(Request $request, ?string $userCode = null, ?string $fallback = null): ?string
+    {
+        if ($userCode !== null && UserRole::isClient($userCode)) {
+            return $userCode;
+        }
+
+        return $request->input('P8_CUST_CD')
+            ?: $request->input('P8_CUST_NAME')
+            ?: $request->input('P3_CUST_CD')
+            ?: $fallback;
+    }
+
+    protected function resolveSortColumn(?string $column): string
+    {
+        $allowed = [
+            'complaint_number',
+            'complaint_date',
+            'client_code',
+            'status',
+            'module',
+            'complaint_type',
+            'error_type',
+            'priority',
+            'closed_date',
+            'assigned_to',
+        ];
+
+        return in_array($column, $allowed, true) ? $column : 'complaint_number';
+    }
+
+    protected function resolveSortOrder(?string $order): string
+    {
+        return strtoupper((string) $order) === 'ASC' ? 'ASC' : 'DESC';
+    }
+
+    protected function nextComplaintNumber(): string
+    {
+        if (DB::connection()->getDriverName() === 'mysql') {
+            $complaintNumber = SqlHelper::selectOne(SqlHelper::genComplaintNoQuery())?->data;
+            if ($complaintNumber) {
+                return $complaintNumber;
+            }
+        }
+
+        $prefix = 'CP'.date('Ym');
+        $seq = CustomerComplaint::query()
+            ->where('complaint_number', 'like', $prefix.'%')
+            ->count() + 1;
+
+        return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildCreateComplaintPayload(
+        Request $request,
+        string $userCode,
+        string $clientCode,
+        string $complaintNumber,
+    ): array {
+        $isStaff = UserRole::isStaff($userCode);
+
+        $data = [
+            'complaint_number' => $complaintNumber,
+            'complaint_date' => $request->input('P3_COMPL_DT'),
+            'client_code' => $clientCode,
+            'module' => $request->input('P3_MODULE'),
+            'complaint_type' => $request->input('P3_COMPL_TYPE'),
+            'error_type' => $request->input('P3_ERROR_TYPE'),
+            'problem_description' => $request->input('P3_PROBLEM_DESC'),
+            'priority' => $request->input('P3_COMPL_LEVEL'),
+            'status' => $request->input('P3_STATUS_TYPE') ?: 'PN',
+            'contact_name' => $request->input('P3_USER_NAME'),
+            'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
+        ];
+
+        if ($isStaff) {
+            $data['internal_remarks'] = $request->input('P3_MAWAI_REMARKS');
+            $data['time_taken'] = $request->input('P8_TIME_TAKEN');
+            $data['closed_date'] = $request->input('P3_CLOSE_DT_TYPE');
+            $data['assigned_to'] = $request->input('P8_ASSIGN_TO') ?: null;
+            $data['changed_by'] = $request->input('P8_CHANGE_DONE_BY');
+            $data['reason'] = $request->input('P8_REASON');
+            $data['action_taken'] = $request->input('P8_ACTION');
+        } else {
+            $data['internal_remarks'] = null;
+            $data['time_taken'] = null;
+            $data['closed_date'] = null;
+            $data['assigned_to'] = null;
+            $data['changed_by'] = null;
+            $data['reason'] = null;
+            $data['action_taken'] = null;
+            $data['status'] = 'PN';
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildUpdateComplaintPayload(
+        Request $request,
+        string $userCode,
+        string $clientCode,
+        ?string $newStatus,
+    ): array {
+        $updates = [
+            'complaint_date' => $request->input('P3_COMPL_DT'),
+            'client_code' => $clientCode,
+            'module' => $request->input('P3_MODULE'),
+            'complaint_type' => $request->input('P3_COMPL_TYPE'),
+            'error_type' => $request->input('P3_ERROR_TYPE'),
+            'problem_description' => $request->input('P3_PROBLEM_DESC'),
+            'priority' => $request->input('P3_COMPL_LEVEL'),
+            'status' => $newStatus,
+            'contact_name' => $request->input('P3_USER_NAME'),
+            'contact_email' => $request->input('P3_CONTACT_MAIL_ID'),
+            'time_taken' => $request->input('P8_TIME_TAKEN') ?: null,
+            'assigned_to' => $request->input('P8_ASSIGN_TO') ?: null,
+            'changed_by' => $request->input('P8_CHANGE_DONE_BY') ?: null,
+        ];
+
+        if (UserRole::isAdmin($userCode) && in_array($newStatus, ['CM', 'CL'], true)) {
+            $updates['closed_date'] = $request->input('P3_CLOSE_DT_TYPE') ?: now()->toDateString();
+        } elseif (! in_array($newStatus, ['CM', 'CL'], true)) {
+            $updates['internal_remarks'] = $request->input('P3_MAWAI_REMARKS');
+            $updates['reason'] = $request->input('P8_REASON');
+            $updates['action_taken'] = $request->input('P8_ACTION');
+            $updates['closed_date'] = $request->input('P3_CLOSE_DT_TYPE') ?: null;
+        }
+
+        return $updates;
     }
 
     protected function storeMessage(
@@ -659,13 +801,23 @@ class ComplaintController extends BaseController
         ]);
     }
 
-    public function downloadComplaintFile($filename)
+    public function downloadComplaintFile(Request $request, $filename)
     {
-        $filePath = public_path('uploads/' . $filename);
-        if (file_exists($filePath)) {
-            return response()->download($filePath);
+        $filename = basename((string) $filename);
+        $filePath = public_path('uploads/'.$filename);
+
+        if (! file_exists($filePath)) {
+            abort(404, 'File not found.');
         }
 
-        abort(404, 'File not found.');
+        $complaint = CustomerComplaint::query()
+            ->where('attachment_name', 'like', '%/'.$filename)
+            ->first();
+
+        if ($complaint && ! ComplaintAccess::canView($request, $complaint)) {
+            abort(403, 'You are not allowed to download this file.');
+        }
+
+        return response()->download($filePath);
     }
 }

@@ -141,15 +141,15 @@
     /* Skeleton table loaders                                              */
     /* ------------------------------------------------------------------ */
     function showTableSkeleton() {
-        $('.loader-wrapper').css('display', 'flex');
-        $('.loader-wrapper .portal-skeleton-table--block').show();
-        $('.loader-wrapper .loader-table').hide();
-        $('.table-responsive').css('display', 'none');
+        $('.loader-wrapper, .portal-table-loader').css('display', 'flex').attr('aria-busy', 'true');
+        $('.portal-table-loader__status').show();
+        $('.loader-wrapper .portal-skeleton-table--block, .portal-table-loader .portal-skeleton-table--block').show();
+        $('.portal-table-wrap, .table-responsive.portal-table-wrap').css('display', 'none');
     }
 
     function hideTableSkeleton() {
-        $('.loader-wrapper').css('display', 'none');
-        $('.table-responsive').css('display', 'block');
+        $('.loader-wrapper, .portal-table-loader').css('display', 'none').attr('aria-busy', 'false');
+        $('.portal-table-wrap, .table-responsive.portal-table-wrap').css('display', 'block');
     }
 
     /* Override default ajax handlers when portal-table-wrap present */
@@ -198,7 +198,7 @@
         var $btn = $(this).find('button[type="submit"]');
         $btn.addClass('is-loading').prop('disabled', true);
         if (!$btn.find('.portal-btn__spinner').length) {
-            $btn.append('<span class="loader-btn portal-btn__spinner" aria-hidden="true"></span>');
+            $btn.append('<span class="portal-dots-loader portal-btn__spinner loader-btn" aria-hidden="true"><span></span><span></span><span></span></span>');
         }
         $btn.find('.portal-btn__label').text('Signing in…');
     });
@@ -291,8 +291,76 @@
                 theme: { mode: isDark ? 'dark' : 'light' },
             };
         },
+        statusChartOptions: function (dataPoints, labels, barColors) {
+            var colors = this.chartColors();
+            var isDark = getTheme() === 'dark';
+            var seriesData = dataPoints || [];
+            var categories = labels || [];
+            var distributedColors = barColors && barColors.length
+                ? barColors
+                : [colors.primary, colors.success, '#2563eb', '#16a34a', '#dc2626'];
+
+            return {
+                chart: {
+                    height: 360,
+                    type: 'bar',
+                    toolbar: { show: false },
+                    background: 'transparent',
+                    foreColor: colors.text,
+                },
+                plotOptions: {
+                    bar: {
+                        horizontal: false,
+                        borderRadius: 6,
+                        columnWidth: '55%',
+                        distributed: true,
+                    },
+                },
+                dataLabels: {
+                    enabled: true,
+                    style: { fontSize: '12px', colors: [colors.text] },
+                    formatter: function (val) { return Math.round(val); },
+                },
+                colors: distributedColors,
+                series: [{ name: 'Complaints', data: seriesData }],
+                xaxis: {
+                    categories: categories,
+                    axisBorder: { show: false },
+                    axisTicks: { show: false },
+                    labels: {
+                        style: { colors: colors.text, fontSize: '11px' },
+                        rotate: -25,
+                        trim: true,
+                    },
+                },
+                yaxis: {
+                    min: 0,
+                    forceNiceScale: true,
+                    tickAmount: 5,
+                    labels: {
+                        formatter: function (val) { return Math.round(val); },
+                        style: { colors: colors.text },
+                    },
+                },
+                grid: {
+                    borderColor: colors.border,
+                    strokeDashArray: 4,
+                },
+                legend: { show: false },
+                tooltip: {
+                    theme: isDark ? 'dark' : 'light',
+                    style: {
+                        fontSize: '12px',
+                        fontFamily: 'var(--font-sans)',
+                    },
+                },
+                theme: { mode: isDark ? 'dark' : 'light' },
+            };
+        },
         updateSidebarToggleIcon: updateSidebarToggleIcon,
         registerChart: registerChart,
         initSelect2: initSelect2,
+        showTableSkeleton: showTableSkeleton,
+        hideTableSkeleton: hideTableSkeleton,
     };
 })(jQuery);

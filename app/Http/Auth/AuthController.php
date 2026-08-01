@@ -3,6 +3,8 @@
 namespace App\Http\Auth;
 
 use App\Models\User;
+use App\Support\ComplaintAnalytics;
+use App\Support\ComplaintStatus;
 use App\Support\SqlHelper;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
@@ -73,56 +75,32 @@ class AuthController extends BaseController
     public function dashboard(Request $request)
     {
         $user = $request->session()->get('user');
-        $customer = SqlHelper::select('
-        SELECT
-            COUNT(CASE WHEN status = \'PN\' THEN 1 END) AS count_pend,
-            COUNT(*) AS total_count
-        FROM
-            '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).'
-        WHERE
-            '.SqlHelper::column('client_code').' = ?
-            AND '.SqlHelper::currentMonthFilter('complaint_date').'
-        ', [$user->user_code]);
+        $clientCounts = ComplaintAnalytics::monthlyStatusCounts($user->user_code);
+        $supportCounts = ComplaintAnalytics::monthlyStatusCounts();
 
         return view('dashboard.dashboard', [
-            'customer' => SqlHelper::dashboardSummary($customer[0] ?? null),
-            'supportSummary' => $this->supportDashboardSummary(),
+            'customer' => (object) [
+                'total_count' => $clientCounts['total'],
+                'count_pend' => $clientCounts['pending'],
+                'count_open' => $clientCounts['open'],
+                'count_closed' => $clientCounts['closed'],
+            ],
+            'supportSummary' => ComplaintAnalytics::toAnalyticsObject($supportCounts),
+            'clientStatusChart' => ComplaintAnalytics::chartPayload($clientCounts),
+            'supportStatusChart' => ComplaintAnalytics::chartPayload($supportCounts),
         ]);
     }
 
     protected function supportDashboardSummary(): object
     {
-        $row = SqlHelper::selectOne('
-            SELECT
-                COUNT(*) AS total,
-                COUNT(CASE WHEN status = \'PN\' THEN 1 END) AS total_pend
-            FROM
-                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
-            WHERE
-                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
-        ');
-
-        return (object) [
-            'total_count' => (int) ($row->total ?? 0),
-            'count_pend' => (int) ($row->total_pend ?? 0),
-        ];
+        return ComplaintAnalytics::toAnalyticsObject(ComplaintAnalytics::monthlyStatusCounts());
     }
 
     public function getPendingList(Request $request)
     {
-        $total_analytics = SqlHelper::selectOne('
-            SELECT
-                COUNT(*) AS total,
-                COUNT(CASE WHEN cc.status = \'PN\' THEN 1 END) AS total_pend
-            FROM
-                '.SqlHelper::table(SqlHelper::TABLE_COMPLAINTS).' cc
-            LEFT JOIN
-                '.SqlHelper::table(SqlHelper::TABLE_CLIENTS).' c
-            ON
-                c.client_code = cc.client_code
-            WHERE
-                '.SqlHelper::currentMonthFilter('cc.complaint_date').'
-        ');
+        $counts = ComplaintAnalytics::monthlyStatusCounts();
+        $total_analytics = ComplaintAnalytics::toAnalyticsObject($counts);
+        $total_analytics->chart = ComplaintAnalytics::chartPayload($counts);
 
         $search = $request->search != '' ? $request->search : '%';
 
@@ -298,18 +276,13 @@ class AuthController extends BaseController
         }
 
         $records = '';
-        $STATUS = [
-            'CL' => 'Cancel',
-            'CM' => 'Complete',
-            'HL' => 'Hold',
-            'PN' => 'Pending',
-            'SV' => 'Sent For Customer Verification',
-        ];
         foreach ($btl_datas as $row) {
             $link = base64_encode($row->complaint_number);
-            $records .= '<tr class="">
-                <td><a href="/complaint/edit/' . $link . '">' . $row->complaint_number . '</a></td>
-                <td>' . @$STATUS[$row->status] . '</td>
+            $statusHtml = ComplaintStatus::tableBadgeHtml($row->status);
+            $rowClass = ComplaintStatus::rowClass($row->status);
+            $records .= '<tr class="'.$rowClass.'">
+                <td><a href="/complaint/edit/'.$link.'">'.e($row->complaint_number).'</a></td>
+                <td class="portal-table__status">'.$statusHtml.'</td>
                 </tr>';
         }
 

@@ -11,6 +11,7 @@
 
     <form action="{{ route('save.create.complaint') }}" id="complaintForm" method="post" enctype="multipart/form-data" class="portal-form">
         @csrf
+        <input type="hidden" name="P3_CUST_CD" value="{{ Session::get('user')->user_code }}">
         @include('include.formHeader', ['title' => 'Complaint Create', 'subtitle' => 'Submit a new support request'])
 
         <div class="row">

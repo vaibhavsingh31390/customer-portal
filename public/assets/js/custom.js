@@ -313,8 +313,15 @@
         });
     });
 
-    // Preloader JS
+    // Preloader — smooth branded exit
     jQuery(window).on("load", function () {
-        $(".preloader").fadeOut();
+        var $preloader = $(".preloader.portal-preloader");
+        if (!$preloader.length) {
+            return;
+        }
+        $preloader.addClass("is-hidden");
+        window.setTimeout(function () {
+            $preloader.remove();
+        }, 420);
     });
 })(jQuery);

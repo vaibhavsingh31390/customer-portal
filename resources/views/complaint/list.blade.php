@@ -1,6 +1,7 @@
 @include('include.topNav')
 
 @php
+    use App\Support\ComplaintStatus;
     $listHeaders = [
         'Complaint No.', 'Complaint Dt.', 'Cust Cd.', 'Cust name', 'Status',
         'Module', 'Compl Type', 'Error Type', 'Problem Desc', 'Close Dt', 'Assign To',
@@ -48,6 +49,17 @@
                             <input type="hidden" id="client_cd" name="client_cd"
                                 value="{{ $customer_name->client_code ?? Session::get('user')->user_code }}">
                         @endif
+                        <div class="form-group col-md-4">
+                            <label for="status_cd">Status</label>
+                            <div class="portal-form__control">
+                                <select id="status_cd" name="status_cd" class="form-control portal-select2"
+                                    data-placeholder="All statuses">
+                                    @foreach (ComplaintStatus::filterOptions() as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="actions">
                         <div class="left portal-actions-left">

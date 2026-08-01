@@ -109,6 +109,10 @@ class SqlHelper
             return "TRUNC({$qualified}, 'MM') = TRUNC(SYSDATE, 'MM')";
         }
 
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            return "strftime('%Y-%m', {$qualified}) = strftime('%Y-%m', 'now')";
+        }
+
         return "DATE_FORMAT({$qualified}, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')";
     }
 

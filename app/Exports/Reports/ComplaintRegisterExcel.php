@@ -28,6 +28,8 @@ class ComplaintRegisterExcel implements FromCollection, WithHeadings, WithCustom
         if (request()->date_from != '' && request()->date_to != '') {
             $query->whereBetween('complaint_date', [request()->date_from, request()->date_to]);
         }
+
+        $query = \App\Support\ComplaintStatus::applyFilter($query, request()->input('status_cd'));
         $data = $query->orderBy('complaint_date', 'DESC')->get();
         $datas = [];
 
@@ -93,6 +95,7 @@ class ComplaintRegisterExcel implements FromCollection, WithHeadings, WithCustom
             ['Customer', request()->client_cd],
             ['From', request()->date_from],
             ['To', request()->date_to],
+            ['Status', request()->status_cd ? (\App\Support\ComplaintStatus::filterOptions()[request()->status_cd] ?? request()->status_cd) : 'All'],
             [''],
             [
                 'Complaint No', 'Complaint Date', 'Client Name', 'Status', 'Module', 'Complaint Type', 'Error Type',

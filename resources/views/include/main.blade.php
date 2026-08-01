@@ -1,5 +1,9 @@
 @include('include.topNav')
 
+@php
+    $clientChart = $clientStatusChart ?? ['labels' => [], 'data' => [], 'colors' => []];
+@endphp
+
 <div class="main-content d-flex flex-column portal-shell__main portal-main">
     <x-page-header title="Dashboard" subtitle="Overview of your complaints and activity">
         <x-slot:actions>
@@ -10,17 +14,23 @@
     </x-page-header>
 
     <div class="row">
-        <div class="col-lg-6 col-sm-6">
-            <x-stat-card label="Total Complaints" :value="$customer->total_count" variant="primary" icon="file-text" />
+        <div class="col-lg-3 col-sm-6">
+            <x-stat-card label="Total (This Month)" :value="$customer->total_count" variant="primary" icon="file-text" />
         </div>
-        <div class="col-lg-6 col-sm-6">
-            <x-stat-card label="Pending Complaints" :value="$customer->count_pend" variant="success" icon="clock" />
+        <div class="col-lg-3 col-sm-6">
+            <x-stat-card label="Open" :value="$customer->count_open" variant="success" icon="folder-open" />
+        </div>
+        <div class="col-lg-3 col-sm-6">
+            <x-stat-card label="Pending" :value="$customer->count_pend" variant="warning" icon="clock" />
+        </div>
+        <div class="col-lg-3 col-sm-6">
+            <x-stat-card label="Closed" :value="$customer->count_closed" variant="default" icon="check-circle" />
         </div>
     </div>
 
     <div class="row">
         <div class="col-lg-6 col-xl-6" id="left_parent">
-            <x-card title="Pending Complaints">
+            <x-card title="Recent Complaints">
                 @include('include.dataTable', [
                     'action' => route('dashboard.pending.list.client'),
                     'headers' => ['Complaint No.', 'Status'],
@@ -29,8 +39,8 @@
             </x-card>
         </div>
         <div class="col-lg-6 col-xl-6" id="right_parent">
-            <x-card title="Total Vs Pending">
-                <div id="total-pending-chart"></div>
+            <x-card title="Complaints by Status (This Month)">
+                <div id="status-breakdown-chart"></div>
             </x-card>
         </div>
     </div>
@@ -51,6 +61,7 @@
 
         const primaryKey = 'COUNT_PEND';
         const emptyColspan = 2;
+        const statusChartData = @json($clientChart);
 
         const getTableData = () => getTableDataByPage(1);
 
@@ -70,7 +81,7 @@
                         jQuery("#pagination").html(res.pagination);
                         resize();
                     } else if (res.status == 0) {
-                        jQuery("#form_detail").html('<tr><td colspan="' + emptyColspan + '" class="portal-table-empty"><div class="portal-empty-state"><p class="portal-empty-state__title">No pending complaints</p><p class="portal-empty-state__desc">All caught up!</p></div></td></tr>');
+                        jQuery("#form_detail").html('<tr><td colspan="' + emptyColspan + '" class="portal-table-empty"><div class="portal-empty-state"><p class="portal-empty-state__title">No complaints found</p></div></td></tr>');
                     }
                 }
             });
@@ -87,22 +98,13 @@
         });
         getTableData();
 
-        let TOT_ANA_TOT = {{ $customer->total_count }};
-        let TOT_ANA_PEND = {{ $customer->count_pend }};
-
         var chart = new ApexCharts(
-            document.querySelector('#total-pending-chart'),
-            window.PortalUI.complaintChartOptions([
-                { name: 'Total', data: [TOT_ANA_TOT] },
-                { name: 'Pending', data: [TOT_ANA_PEND] },
-            ])
+            document.querySelector('#status-breakdown-chart'),
+            window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors)
         );
         chart.render();
         window.PortalUI.registerChart(chart, function () {
-            return window.PortalUI.complaintChartOptions([
-                { name: 'Total', data: [TOT_ANA_TOT] },
-                { name: 'Pending', data: [TOT_ANA_PEND] },
-            ]);
+            return window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors);
         });
 
         const resize = () => {
