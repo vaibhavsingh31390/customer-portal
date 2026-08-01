@@ -139,8 +139,8 @@ class AuthController extends BaseController
         $number_of_page = $btl_datas->lastPage();
         $currentPage = $btl_datas->currentPage();
         $total_items = $btl_datas->total();
-        $displayfrom = ($currentPage - 1) * $request->per_page + 1;
-        $displayto = ($currentPage - 1) * $request->per_page + $count;
+        $displayfrom = ($currentPage - 1) * $perPage + 1;
+        $displayto = ($currentPage - 1) * $perPage + $count;
         $pagination = '';
 
         if ($number_of_page > 1) {
@@ -229,8 +229,8 @@ class AuthController extends BaseController
         $number_of_page = $btl_datas->lastPage();
         $currentPage = $btl_datas->currentPage();
         $total_items = $btl_datas->total();
-        $displayfrom = ($currentPage - 1) * $request->per_page + 1;
-        $displayto = ($currentPage - 1) * $request->per_page + $count;
+        $displayfrom = ($currentPage - 1) * $perPage + 1;
+        $displayto = ($currentPage - 1) * $perPage + $count;
         $pagination = '';
 
         if ($number_of_page > 1) {

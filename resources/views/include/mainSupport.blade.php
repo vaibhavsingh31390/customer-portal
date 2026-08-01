@@ -50,7 +50,7 @@
     @include('include.footer')
 </div>
 
-@section('scripts')
+@push('scripts')
     <script>
         let statusChartData = @json($supportChart);
 
@@ -62,13 +62,15 @@
 
             if (analytics.chart) {
                 statusChartData = analytics.chart;
-                chart.updateOptions(
-                    window.PortalUI.statusChartOptions(
-                        statusChartData.data,
-                        statusChartData.labels,
-                        statusChartData.colors
-                    )
-                );
+                if (window.supportStatusChart) {
+                    window.supportStatusChart.updateOptions(
+                        window.PortalUI.statusChartOptions(
+                            statusChartData.data,
+                            statusChartData.labels,
+                            statusChartData.colors
+                        )
+                    );
+                }
             }
         }
 
@@ -94,16 +96,21 @@
                 url: $('#listForm').attr('action'),
                 data: { page: PAGENO, search, per_page, sorting: primaryKey, order: 'DESC' },
                 success: function(res) {
+                    if (res.total_analytics) {
+                        updateChartData(res.total_analytics);
+                    }
                     if (res.status == 1) {
                         jQuery("#form_detail").html(res.data);
                         jQuery("#pagination").html(res.pagination);
-                        if (res.total_analytics) {
-                            updateChartData(res.total_analytics);
-                        }
                         resize();
                     } else if (res.status == 0) {
-                        jQuery("#form_detail").html('<tr><td colspan="' + emptyColspan + '" class="portal-table-empty"><div class="portal-empty-state"><p class="portal-empty-state__title">No data found</p></div></td></tr>');
+                        jQuery("#form_detail").html('<tr><td colspan="' + emptyColspan + '" class="portal-table-empty"><div class="portal-empty-state"><p class="portal-empty-state__title">No pending complaints by client</p></div></td></tr>');
+                        jQuery("#pagination").html('');
                     }
+                },
+                error: function() {
+                    jQuery("#form_detail").html('<tr><td colspan="' + emptyColspan + '" class="portal-table-empty"><div class="portal-empty-state"><p class="portal-empty-state__title">Could not load dashboard data</p></div></td></tr>');
+                    jQuery("#pagination").html('');
                 }
             });
         }
@@ -114,18 +121,29 @@
 
         $(document).ready(() => {
             $('#dataTable_filter input').on('keyup', debounce(() => getTableDataByPage(1), 500));
-        });
-        getTableData();
+            getTableData();
 
-        var chart = new ApexCharts(
-            document.querySelector('#status-breakdown-chart'),
-            window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors)
-        );
-        chart.render();
-        window.PortalUI.registerChart(chart, function () {
-            return window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors);
+            if (typeof ApexCharts === 'undefined') {
+                console.error('ApexCharts failed to load — status chart unavailable.');
+                return;
+            }
+
+            var chartEl = document.querySelector('#status-breakdown-chart');
+            if (!chartEl) {
+                return;
+            }
+
+            var chart = new ApexCharts(
+                chartEl,
+                window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors)
+            );
+            chart.render();
+            window.PortalUI.registerChart(chart, function () {
+                return window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors);
+            });
+            window.supportStatusChart = chart;
         });
 
         const resize = () => { $('#right_parent').height($('#left_parent').height()); };
     </script>
-@endsection
+@endpush

@@ -49,7 +49,7 @@
     @include('include.footer')
 </div>
 
-@section('scripts')
+@push('scripts')
     <script>
         const debounce = (callback, delay) => {
             let timeoutId;
@@ -95,20 +95,29 @@
 
         $(document).ready(() => {
             $('#dataTable_filter input').on('keyup', debounce(getTableDataBySearch, 500));
-        });
-        getTableData();
+            getTableData();
 
-        var chart = new ApexCharts(
-            document.querySelector('#status-breakdown-chart'),
-            window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors)
-        );
-        chart.render();
-        window.PortalUI.registerChart(chart, function () {
-            return window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors);
+            if (typeof ApexCharts === 'undefined') {
+                return;
+            }
+
+            var chartEl = document.querySelector('#status-breakdown-chart');
+            if (!chartEl) {
+                return;
+            }
+
+            var chart = new ApexCharts(
+                chartEl,
+                window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors)
+            );
+            chart.render();
+            window.PortalUI.registerChart(chart, function () {
+                return window.PortalUI.statusChartOptions(statusChartData.data, statusChartData.labels, statusChartData.colors);
+            });
         });
 
         const resize = () => {
             $('#right_parent').height($('#left_parent').height());
         };
     </script>
-@endsection
+@endpush
